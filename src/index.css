@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #1a56db;
+  --color-success: #16a34a;
+  --color-rejected: #dc2626;
+  --color-pending: #d97706;
+  --color-page: #f9fafb;
+  --color-border-custom: #e5e7eb;
+}
+
+body {
+  background-color: var(--color-page);
+  color: #111827;
+}
