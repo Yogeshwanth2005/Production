@@ -127,16 +127,20 @@ function QCRow({ item, batchNum, updateFn }) {
   const [qcStatus, setQcStatus] = useState('Approved');
   const [remarks, setRemarks] = useState('');
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (gasPurity === '') return;
-    updateFn(batchNum, item.serialNumber, {
-      gasPurity: Number(gasPurity),
-      pressureCheck,
-      leakTest,
-      valveCondition,
-      remarks,
-      qcStatus: qcStatus === 'Approved' ? 'QC Passed' : 'QC Failed',
-    });
+    try {
+      await updateFn(batchNum, item.serialNumber, {
+        gasPurity: Number(gasPurity),
+        pressureCheck,
+        leakTest,
+        valveCondition,
+        remarks,
+        qcStatus: qcStatus === 'Approved' ? 'QC Passed' : 'QC Failed',
+      });
+    } catch (err) {
+      alert("Error submitting QC: " + err.message);
+    }
   };
 
   const selectClass = "border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white transition-shadow";
@@ -148,7 +152,7 @@ function QCRow({ item, batchNum, updateFn }) {
         <input
           type="number" value={gasPurity} onChange={e => setGasPurity(e.target.value)}
           className="w-24 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow"
-          placeholder="99.5" min="0" max="100"
+          placeholder="e.g. 99.0" min="0" max="100"
         />
       </td>
       <td className="p-4">

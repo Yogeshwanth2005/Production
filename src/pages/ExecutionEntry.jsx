@@ -1,24 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
 
 export default function ExecutionEntry() {
   const { activeBatch, activeProductConfig, updateItemInBatch, addItemToBatch } = useSharedState();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newSerial, setNewSerial] = useState('');
+  const [selectedSerials, setSelectedSerials] = useState([]);
+  const [availableCylinders, setAvailableCylinders] = useState([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchCylinders = async () => {
+      try {
+        const res = await fetch('/api/cylinder-issues');
+        if (res.ok) {
+          const issues = await res.json();
+          const serials = issues.flatMap(iss => iss.items.map(i => i.serial_number));
+          setAvailableCylinders([...new Set(serials)]);
+        }
+      } catch (err) {
+        console.error("Failed to load cylinders", err);
+      }
+    };
+    fetchCylinders();
+  }, []);
 
   if (!activeBatch || !activeProductConfig) return <div>Loading...</div>;
 
   const isReadOnly = activeBatch.status === "Complete";
   const itemsToProcess = activeBatch.items.filter(item => item.itemStatus === "Issued");
 
-  const handleAddCylinder = async () => {
-    if (!newSerial.trim()) return;
-    if (activeBatch.items.find(i => i.serialNumber === newSerial.trim().toUpperCase())) {
-      alert("Cylinder already in batch");
-      return;
+  const toggleSerial = (serial) => {
+    if (selectedSerials.includes(serial)) {
+      setSelectedSerials(prev => prev.filter(s => s !== serial));
+    } else {
+      setSelectedSerials(prev => [...prev, serial]);
     }
-    await addItemToBatch(activeBatch.batchNumber, newSerial.trim().toUpperCase());
-    setNewSerial('');
+  };
+
+  const handleAddMultiple = async () => {
+    if (selectedSerials.length === 0) return;
+    
+    try {
+      // Process them sequentially to avoid race conditions with state updates
+      for (const serial of selectedSerials) {
+        if (!activeBatch.items.find(i => i.serialNumber === serial)) {
+          await addItemToBatch(activeBatch.batchNumber, serial);
+        }
+      }
+      setSelectedSerials([]);
+      setIsDropdownOpen(false);
+    } catch (err) {
+      alert("Error adding cylinder: " + err.message);
+    }
   };
 
   return (
@@ -51,13 +84,56 @@ export default function ExecutionEntry() {
       </div>
 
       {!isReadOnly && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex gap-4 items-end">
-          <div className="flex-1">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Scan or Enter Cylinder Serial Number</label>
-              <input type="text" value={newSerial} onChange={e => setNewSerial(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddCylinder(); }} className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all font-sans font-mono uppercase" placeholder="e.g. OXY-CYL-0101" />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex gap-4 items-end relative">
+          <div className="flex-1 relative">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Select Cylinders to Process</label>
+              
+              <div 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-full bg-white border border-gray-300 rounded-lg p-2 min-h-[46px] text-sm cursor-pointer flex justify-between items-center hover:border-primary transition-colors shadow-sm"
+              >
+                <div className="flex flex-wrap gap-1.5 flex-1 items-center">
+                  {selectedSerials.length === 0 ? (
+                    <span className="font-sans text-gray-500 ml-1">-- Select issued empty cylinders --</span>
+                  ) : (
+                    selectedSerials.map(serial => (
+                      <span key={serial} className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-md text-xs font-mono font-bold border border-gray-200 shadow-sm transition-colors hover:bg-gray-50">
+                        {serial}
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); toggleSerial(serial); }} 
+                          className="text-gray-400 hover:text-red-500 hover:bg-gray-200 rounded-full w-5 h-5 flex items-center justify-center font-bold pb-0.5 leading-none cursor-pointer transition-colors"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))
+                  )}
+                </div>
+                <span className={`text-gray-400 px-2 transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
+              </div>
+
+              {isDropdownOpen && (
+                <div className="absolute z-50 w-full mt-2 border border-gray-200 rounded-lg max-h-56 overflow-y-auto bg-white shadow-xl">
+                    {availableCylinders.filter(serial => !activeBatch.items.some(i => i.serialNumber === serial)).length === 0 ? (
+                      <div className="text-gray-400 text-sm italic p-4 text-center bg-gray-50">No available empty cylinders found from issues.</div>
+                    ) : availableCylinders
+                      .filter(serial => !activeBatch.items.some(i => i.serialNumber === serial))
+                      .map(serial => (
+                        <label key={serial} className="flex items-center gap-3 p-3 hover:bg-blue-50/80 cursor-pointer border-b border-gray-100 last:border-0 transition-colors">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedSerials.includes(serial)}
+                            onChange={() => toggleSerial(serial)}
+                            className="w-4.5 h-4.5 text-primary bg-white border-gray-300 rounded focus:ring-primary cursor-pointer"
+                          />
+                          <span className="font-mono text-sm text-gray-700 font-bold uppercase tracking-wide">{serial}</span>
+                        </label>
+                    ))}
+                </div>
+              )}
           </div>
-          <button onClick={handleAddCylinder} disabled={!newSerial.trim()} className="bg-primary hover:bg-blue-700 disabled:bg-gray-200 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm whitespace-nowrap">
-            Add to Batch
+          <button onClick={handleAddMultiple} disabled={selectedSerials.length === 0} className="bg-primary hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white px-8 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm whitespace-nowrap">
+            Add {selectedSerials.length > 0 ? `(${selectedSerials.length}) ` : ''}to Batch
           </button>
         </div>
       )}

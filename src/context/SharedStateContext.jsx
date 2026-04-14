@@ -166,16 +166,16 @@ export const SharedStateProvider = ({ children }) => {
 
   // --- Item operations ---
   const addItemToBatch = async (batchNum, serialNumber) => {
-    try {
-      await fetch(`${API}/batches/${batchNum}/items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serial_number: serialNumber })
-      });
-      await fetchBatches();
-    } catch (err) {
-      console.error('Failed to add item:', err);
+    const res = await fetch(`${API}/batches/${batchNum}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serial_number: serialNumber })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `HTTP Error ${res.status}`);
     }
+    await fetchBatches();
   };
 
   const removeItemFromBatch = async (batchNum, serialNumber) => {
@@ -188,16 +188,16 @@ export const SharedStateProvider = ({ children }) => {
   };
 
   const updateItemInBatch = async (batchNum, serialNumber, updates) => {
-    try {
-      await fetch(`${API}/batches/${batchNum}/items/${serialNumber}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(toSnakeCase(updates))
-      });
-      await fetchBatches();
-    } catch (err) {
-      console.error('Failed to update item:', err);
+    const res = await fetch(`${API}/batches/${batchNum}/items/${serialNumber}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toSnakeCase(updates))
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `HTTP Error ${res.status}`);
     }
+    await fetchBatches();
   };
 
   // --- Safety Checklist operations ---
