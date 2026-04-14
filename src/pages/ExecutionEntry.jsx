@@ -2,13 +2,24 @@ import React, { useState } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
 
 export default function ExecutionEntry() {
-  const { activeBatch, activeProductConfig, updateItemInBatch } = useSharedState();
+  const { activeBatch, activeProductConfig, updateItemInBatch, addItemToBatch } = useSharedState();
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newSerial, setNewSerial] = useState('');
 
   if (!activeBatch || !activeProductConfig) return <div>Loading...</div>;
 
   const isReadOnly = activeBatch.status === "Complete";
   const itemsToProcess = activeBatch.items.filter(item => item.itemStatus === "Issued");
+
+  const handleAddCylinder = async () => {
+    if (!newSerial.trim()) return;
+    if (activeBatch.items.find(i => i.serialNumber === newSerial.trim().toUpperCase())) {
+      alert("Cylinder already in batch");
+      return;
+    }
+    await addItemToBatch(activeBatch.batchNumber, newSerial.trim().toUpperCase());
+    setNewSerial('');
+  };
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto">
@@ -38,6 +49,18 @@ export default function ExecutionEntry() {
           </div>
         </div>
       </div>
+
+      {!isReadOnly && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex gap-4 items-end">
+          <div className="flex-1">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Scan or Enter Cylinder Serial Number</label>
+              <input type="text" value={newSerial} onChange={e => setNewSerial(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddCylinder(); }} className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all font-sans font-mono uppercase" placeholder="e.g. OXY-CYL-0101" />
+          </div>
+          <button onClick={handleAddCylinder} disabled={!newSerial.trim()} className="bg-primary hover:bg-blue-700 disabled:bg-gray-200 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm whitespace-nowrap">
+            Add to Batch
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
