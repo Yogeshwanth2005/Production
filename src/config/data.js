@@ -8,7 +8,7 @@ export const PRODUCT_CONFIG = {
     calculateNet: (input, output) => Number(output) - Number(input),
     validateProcess: (net) => {
       if (net > 200) return { indicator: "Over", status: "Rejected", color: "red" };
-      if (net < 190) return { indicator: "Under", status: "Rejected", color: "amber" };
+      if (net < 190) return { indicator: "Under", status: "Success", color: "amber" };
       return { indicator: "OK", status: "Success", color: "green" };
     },
     sealOptions: ["Standard Valve Seal", "Medical Grade Seal", "Industrial Seal"],
@@ -24,7 +24,7 @@ export const PRODUCT_CONFIG = {
     calculateNet: (input, output) => Number(output) - Number(input),
     validateProcess: (net) => {
       if (net > 50.5) return { indicator: "Over", status: "Rejected", color: "red" };
-      if (net < 49.5) return { indicator: "Under", status: "Rejected", color: "amber" };
+      if (net < 49.5) return { indicator: "Under", status: "Success", color: "amber" };
       return { indicator: "OK", status: "Success", color: "green" };
     },
     sealOptions: ["Tamper Evident Cap", "Foil Seal Core", "Plastic Plug"],

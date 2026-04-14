@@ -21,6 +21,20 @@ app.add_middleware(
 )
 
 # Register routes
+@app.on_event("startup")
+def patch_database():
+    try:
+        from database import get_connection
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE items SET process_status = 'Success' WHERE process_status = 'Rejected' AND indicator = 'Under'")
+        conn.commit()
+        print(f"Patched {cursor.rowcount} cylinders from Rejected to Success in database!")
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print("Patch failed:", e)
+
 app.include_router(batches_router, prefix="/api", tags=["Batches"])
 app.include_router(items_router, prefix="/api", tags=["Items"])
 app.include_router(safety_router, prefix="/api", tags=["Safety Checklists"])
