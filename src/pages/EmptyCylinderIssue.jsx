@@ -14,7 +14,9 @@ export default function EmptyCylinderIssue() {
   const [lineItems, setLineItems] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [filterDate, setFilterDate] = useState('');
+
+  // View mode: null = list, 'view' = detail view, 'create' = create form
+  const [viewingIssue, setViewingIssue] = useState(null);
 
   const fetchIssues = async () => {
     try {
@@ -87,72 +89,122 @@ export default function EmptyCylinderIssue() {
     }
   };
 
-  const filteredIssues = filterDate ? issues.filter(iss => iss.date === filterDate) : issues;
+  const filteredIssues = issues;
 
-  return (
-    <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-      {!isCreating ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-6 bg-orange-500 rounded-full"></div>
-              <h3 className="font-bold text-gray-800 text-lg">Cylinder Issue Records</h3>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-semibold text-gray-600">Filter Date:</label>
-                <div className="relative flex items-center">
-                  <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="bg-white border border-gray-300 text-gray-700 rounded-lg p-2 pr-8 text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm" />
-                  {filterDate && <button onClick={() => setFilterDate('')} className="absolute right-2 text-gray-400 hover:text-red-500 text-sm font-bold bg-white px-1">✕</button>}
-                </div>
+  // ── VIEW MODE ──────────────────────────────────────────────────
+  if (viewingIssue) {
+    return (
+      <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-2 h-full bg-orange-500"></div>
+
+          {/* Back button */}
+          <button
+            onClick={() => setViewingIssue(null)}
+            className="absolute top-4 right-4 flex items-center gap-1.5 text-gray-400 hover:text-gray-700 text-sm font-semibold bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors border border-gray-200"
+          >
+            ← Back to List
+          </button>
+
+          <h2 className="text-xl font-bold text-gray-800 mb-1 pl-4">Issue Details</h2>
+          <p className="text-xs text-gray-400 pl-4 mb-6 uppercase tracking-widest font-semibold">
+            Cylinder Issue Record
+          </p>
+
+          {/* Header fields (read-only) */}
+          <div className="grid grid-cols-3 gap-4 mb-6 pl-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Issue ID</label>
+              <div className="bg-orange-50 border border-orange-200 font-mono text-orange-800 rounded-lg p-2.5 text-sm font-bold">
+                {viewingIssue.issue_id}
               </div>
-              <button onClick={() => setIsCreating(true)} className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center gap-2">
-                + Create New Issue
-              </button>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Date</label>
+              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
+                {viewingIssue.date}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Gas Type Planned</label>
+              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
+                {viewingIssue.gas_type_planned}
+              </div>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-white border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
-                  <th className="p-4">Issue ID</th>
-                  <th className="p-4">Date</th>
-                  <th className="p-4">From → To</th>
-                  <th className="p-4">Gas Type</th>
-                  <th className="p-4 text-center">Cylinders</th>
-                  <th className="p-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredIssues.length > 0 ? filteredIssues.map(iss => (
-                  <tr key={iss.issue_id} className="hover:bg-orange-50/30 transition-colors">
-                    <td className="p-4 font-mono text-orange-700 font-semibold">{iss.issue_id}</td>
-                    <td className="p-4 text-gray-600">{iss.date}</td>
-                    <td className="p-4 text-gray-700">{iss.from_location} <span className="text-gray-300 mx-1">→</span> {iss.to_location}</td>
-                    <td className="p-4 text-gray-600 font-medium">{iss.gas_type_planned}</td>
-                    <td className="p-4 text-center font-bold text-gray-800">
-                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg border border-gray-200/50">{iss.items.length}</span>
-                    </td>
-                    <td className="p-4">
-                      <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
-                        iss.status === 'Completed'
-                          ? 'bg-green-50 text-green-700 border-green-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>{iss.status}</span>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="6" className="p-16 text-center text-gray-400 italic font-medium bg-gray-50/50">
-                      No issue records found {filterDate ? 'for this date' : 'yet'}.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+
+          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">From Location</label>
+              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
+                {viewingIssue.from_location}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">To Location</label>
+              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
+                {viewingIssue.to_location}
+              </div>
+            </div>
+          </div>
+
+          {/* Summary */}
+          <div className="flex items-center gap-4 pl-4 mb-6">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Cylinders:</span>
+              <span className="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-orange-200">
+                {viewingIssue.items.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Cylinders table */}
+          <div className="pl-4">
+            <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider mb-3 border-t border-gray-100 pt-5">
+              Line Items — Cylinders
+            </h3>
+            {viewingIssue.items.length === 0 ? (
+              <div className="text-sm text-gray-400 italic border-2 border-dashed border-gray-200 rounded-xl p-8 text-center bg-gray-50/50">
+                No cylinders in this issue.
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="bg-white border-b border-gray-200 text-gray-500 text-xs uppercase tracking-widest font-bold">
+                      <th className="p-3 pl-4">#</th>
+                      <th className="p-3">Serial Number</th>
+                      <th className="p-3">Cylinder Type</th>
+                      <th className="p-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {viewingIssue.items.map((item, idx) => (
+                      <tr key={item.serial_number} className="hover:bg-white transition-colors">
+                        <td className="p-3 pl-4 text-gray-400 font-mono text-xs">{idx + 1}</td>
+                        <td className="p-3 font-mono text-orange-700 font-bold tracking-tight">{item.serial_number}</td>
+                        <td className="p-3 text-gray-600 font-medium">{item.cylinder_type}</td>
+                        <td className="p-3">
+                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md text-xs font-bold border border-gray-200/50">
+                            {item.current_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
-      ) : (
+      </div>
+    );
+  }
+
+  // ── CREATE MODE ────────────────────────────────────────────────
+  if (isCreating) {
+    return (
+      <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-2 h-full bg-orange-500"></div>
           <button onClick={() => setIsCreating(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-lg">✕</button>
@@ -277,8 +329,10 @@ export default function EmptyCylinderIssue() {
                 </div>
               </div>
             )}
-            
-            <p className="text-[11px] text-gray-500 mt-2 font-medium bg-orange-50/50 inline-block px-3 py-1.5 rounded-md border border-orange-100">👆 Only <strong>Empty</strong> cylinders allowed for issue to filling.</p>
+
+            <p className="text-[11px] text-gray-500 mt-2 font-medium bg-orange-50/50 inline-block px-3 py-1.5 rounded-md border border-orange-100">
+              Only <strong>Empty</strong> cylinders allowed for issue to filling.
+            </p>
           </div>
 
           <div className="pl-4 pt-4 border-t border-gray-100 flex justify-end">
@@ -288,7 +342,64 @@ export default function EmptyCylinderIssue() {
             </button>
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  // ── LIST MODE ──────────────────────────────────────────────────
+  return (
+    <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-6 bg-orange-500 rounded-full"></div>
+            <h3 className="font-bold text-gray-800 text-lg">Cylinder Issue Records</h3>
+          </div>
+          <button onClick={() => setIsCreating(true)} className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center gap-2">
+            + Create New Issue
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="bg-white border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
+                <th className="p-4">Issue ID</th>
+                <th className="p-4">Date</th>
+                <th className="p-4">From → To</th>
+                <th className="p-4">Gas Type</th>
+                <th className="p-4 text-center">Cylinders</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredIssues.length > 0 ? filteredIssues.map(iss => (
+                <tr key={iss.issue_id} className="hover:bg-orange-50/30 transition-colors group">
+                  {/* Clickable Issue ID */}
+                  <td className="p-4">
+                    <button
+                      onClick={() => setViewingIssue(iss)}
+                      className="font-mono text-orange-600 font-semibold hover:text-orange-800 hover:underline underline-offset-2 transition-colors text-left"
+                    >
+                      {iss.issue_id}
+                    </button>
+                  </td>
+                  <td className="p-4 text-gray-600">{iss.date}</td>
+                  <td className="p-4 text-gray-700">{iss.from_location} <span className="text-gray-300 mx-1">→</span> {iss.to_location}</td>
+                  <td className="p-4 text-gray-600 font-medium">{iss.gas_type_planned}</td>
+                  <td className="p-4 text-center font-bold text-gray-800">
+                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg border border-gray-200/50">{iss.items.length}</span>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan="5" className="p-16 text-center text-gray-400 italic font-medium bg-gray-50/50">
+                    No issue records found yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

@@ -37,14 +37,14 @@ export default function FilledInventory() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-lg">📦</div>
+          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-lg"></div>
           <div>
             <div className="text-2xl font-bold text-gray-800">{itemsToMove.length}</div>
             <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">Ready to Move</div>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-lg">🏪</div>
+          <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-lg"></div>
           <div>
             <div className="text-2xl font-bold text-teal-600">{movedItems.length}</div>
             <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">In Inventory</div>
@@ -116,7 +116,7 @@ export default function FilledInventory() {
               disabled={!canSubmit}
               className="bg-teal-600 hover:bg-teal-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center gap-2"
             >
-              📦 Move All to Inventory
+              Move All to Inventory
             </button>
           )}
         </div>
@@ -138,7 +138,7 @@ export default function FilledInventory() {
                 <tr>
                   <td colSpan="7" className="p-12 text-center text-gray-500 font-medium">
                     {movedItems.length > 0
-                      ? `✅  All ${movedItems.length} item(s) have been moved to filled inventory.`
+                      ? `  All ${movedItems.length} item(s) have been moved to filled inventory.`
                       : 'No items ready. Items must be tagged before moving to inventory.'}
                   </td>
                 </tr>
@@ -191,7 +191,7 @@ function InventoryRow({ item, fromLocation, toLocation, date, transactionId, bat
           disabled={!canSubmit}
           className="bg-teal-600 hover:bg-teal-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm"
         >
-          📦 Move
+          Move
         </button>
       </td>
     </tr>

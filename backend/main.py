@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from database import init_database, seed_demo_data
+from database import init_database
 from routes.batches import router as batches_router
 from routes.items import router as items_router
 from routes.safety import router as safety_router
@@ -49,6 +49,5 @@ def root():
 if __name__ == "__main__":
     print("Initializing database...")
     init_database()
-    seed_demo_data()
     print("Starting SOGFusion API server...")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

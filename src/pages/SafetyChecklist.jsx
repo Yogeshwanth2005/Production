@@ -78,7 +78,7 @@ export default function SafetyChecklist() {
               onClick={handleNewChecklist}
               className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-2.5 rounded-lg font-semibold text-sm transition-all shadow-sm"
             >
-              🛡️ New Checklist
+              New Checklist
             </button>
           </div>
         ) : (
@@ -120,7 +120,7 @@ export default function SafetyChecklist() {
             {/* Checklist Items */}
             <div className="border border-gray-200 rounded-xl overflow-hidden mb-6">
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center gap-2">
-                <span className="text-base">📋</span>
+                <span className="text-base"></span>
                 <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Checklist Items</h3>
               </div>
               <div className="divide-y divide-gray-100">
@@ -132,11 +132,10 @@ export default function SafetyChecklist() {
                     </div>
                     <button
                       onClick={() => toggleCheck(ci.id)}
-                      className={`px-6 py-1.5 rounded-full text-sm font-bold border transition-all ${
-                        checks[ci.id] === 'OK'
+                      className={`px-6 py-1.5 rounded-full text-sm font-bold border transition-all ${checks[ci.id] === 'OK'
                           ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
                           : 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200'
-                      }`}
+                        }`}
                     >
                       {checks[ci.id]}
                     </button>
@@ -158,7 +157,7 @@ export default function SafetyChecklist() {
               disabled={!fillingStation.trim() || !supervisorName.trim()}
               className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold text-sm transition-all shadow-sm"
             >
-              🛡️ Submit Safety Checklist
+              Submit Safety Checklist
             </button>
           </>
         )}
@@ -168,7 +167,7 @@ export default function SafetyChecklist() {
       {safetyChecklists.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
-            <span className="text-base">📜</span>
+            <span className="text-base"></span>
             <h3 className="font-bold text-gray-800">Submission History</h3>
           </div>
           <div className="overflow-x-auto">
@@ -190,11 +189,10 @@ export default function SafetyChecklist() {
                     <td className="p-4 text-gray-600">{cl.fillingStation}</td>
                     <td className="p-4 text-gray-600">{cl.supervisorName}</td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                        cl.status === 'Passed'
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${cl.status === 'Passed'
                           ? 'bg-green-100 text-green-700 border-green-200'
                           : 'bg-red-100 text-red-700 border-red-200'
-                      }`}>
+                        }`}>
                         {cl.status}
                       </span>
                     </td>

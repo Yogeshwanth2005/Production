@@ -253,7 +253,8 @@ export const SharedStateProvider = ({ children }) => {
       updateItemInBatch,
       completeBatch,
       safetyChecklists,
-      addSafetyChecklist
+      addSafetyChecklist,
+      fetchBatches
     }}>
       {children}
     </SharedStateContext.Provider>
