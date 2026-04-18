@@ -77,18 +77,6 @@ export default function Layout() {
             <h1 className="text-xl font-bold text-gray-800 tracking-tight">{getPageTitle()}</h1>
           </div>
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-600">Active Batch:</span>
-              <select
-                value={activeBatchNumber}
-                onChange={(e) => setActiveBatchNumber(e.target.value)}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-1.5 px-3 outline-none"
-              >
-                {batches.map(b => (
-                  <option key={b.batchNumber} value={b.batchNumber}>{b.batchNumber} ({b.productType})</option>
-                ))}
-              </select>
-            </div>
             <div className="text-sm text-gray-500 font-medium">
               Production Unit A
             </div>
