@@ -39,6 +39,12 @@ function convertBatch(batch) {
     batchNumber: batch.batch_number,
     productType: batch.product_type,
     status: batch.status,
+    batchDate: batch.batch_date || null,
+    gasType: batch.gas_type || null,
+    fillingStation: batch.filling_station || null,
+    tankId: batch.tank_id || null,
+    operatorName: batch.operator_name || null,
+    shift: batch.shift || null,
     items: (batch.items || []).map(convertItem),
   };
 }

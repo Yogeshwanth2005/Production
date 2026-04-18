@@ -2,9 +2,17 @@ import React, { useState } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
 
 export default function FillingBatchCreation() {
-  const { productConfig, batches, deleteBatch, fetchBatches, setActiveBatchNumber } = useSharedState();
+  const { productConfig, batches, fetchBatches, setActiveBatchNumber } = useSharedState();
 
-  const [isCreating, setIsCreating] = useState(false);
+  const [view, setView] = useState('list'); // 'list' | 'create' | 'detail'
+  const [viewBatch, setViewBatch] = useState(null);
+
+  const generateBatchNumber = () => {
+    const prefix = 'GAS';
+    const num = Math.floor(1000 + Math.random() * 9000);
+    const year = new Date().getFullYear();
+    return `BATCH-${year}-${prefix}-${num}`;
+  };
 
   const [form, setForm] = useState({
     batchNumber: '',
@@ -23,11 +31,19 @@ export default function FillingBatchCreation() {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const generateBatchNumber = () => {
-    const prefix = form.gasType.substring(0, 3).toUpperCase();
-    const num = Math.floor(1000 + Math.random() * 9000);
-    const year = new Date().getFullYear();
-    setForm(prev => ({ ...prev, batchNumber: `BATCH-${year}-${prefix}-${num}` }));
+  const handleStartCreating = () => {
+    setForm(prev => ({ ...prev, batchNumber: generateBatchNumber() }));
+    setView('create');
+  };
+
+  const handleViewBatch = (batch) => {
+    setViewBatch(batch);
+    setView('detail');
+  };
+
+  const handleBackToList = () => {
+    setView('list');
+    setViewBatch(null);
   };
 
   const handleSubmit = async () => {
@@ -59,7 +75,7 @@ export default function FillingBatchCreation() {
         fillingStation: '', tankId: '', operatorName: '', shift: 'Morning',
       });
 
-      setIsCreating(false);
+      setView('list');
 
       // Refresh batches in context and set the new batch as active
       await fetchBatches();
@@ -70,20 +86,10 @@ export default function FillingBatchCreation() {
     }
   };
 
-  const handleDelete = async (batchNumber) => {
-    if (!confirm(`Are you sure you want to delete batch "${batchNumber}"? This will also delete all its items.`)) return;
-    try {
-      await deleteBatch(batchNumber);
-    } catch (err) {
-      console.error('Failed to delete batch:', err);
-      alert('Failed to delete batch.');
-    }
-  };
-
 
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-      {!isCreating ? (
+      {view === 'list' && (
         /* ─── LIST VIEW ─── */
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
@@ -92,7 +98,7 @@ export default function FillingBatchCreation() {
               <h3 className="font-bold text-gray-800 text-lg">Batch Records</h3>
             </div>
             <button
-              onClick={() => setIsCreating(true)}
+              onClick={handleStartCreating}
               className="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center gap-2"
             >
               + Create New Batch
@@ -106,13 +112,12 @@ export default function FillingBatchCreation() {
                   <th className="p-4">Product Type</th>
                   <th className="p-4 text-center">Cylinders</th>
                   <th className="p-4">Status</th>
-                  <th className="p-4 text-right pr-6">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {batches.length > 0 ? batches.map(batch => (
-                  <tr key={batch.batchNumber} className="hover:bg-sky-50/30 transition-colors">
-                    <td className="p-4 font-mono text-sky-700 font-semibold">{batch.batchNumber}</td>
+                  <tr key={batch.batchNumber} className="hover:bg-sky-50/30 transition-colors cursor-pointer" onClick={() => handleViewBatch(batch)}>
+                    <td className="p-4 font-mono text-sky-700 font-semibold hover:underline">{batch.batchNumber}</td>
                     <td className="p-4 text-gray-600 font-medium">{batch.productType}</td>
                     <td className="p-4 text-center font-bold text-gray-800">
                       <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg border border-gray-200/50">{batch.items.length}</span>
@@ -124,18 +129,10 @@ export default function FillingBatchCreation() {
                           : 'bg-amber-50 text-amber-700 border-amber-200'
                       }`}>{batch.status}</span>
                     </td>
-                    <td className="p-4 text-right pr-6">
-                      <button
-                        onClick={() => handleDelete(batch.batchNumber)}
-                        className="text-red-400 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan="5" className="p-16 text-center text-gray-400 italic font-medium bg-gray-50/50">
+                    <td colSpan="4" className="p-16 text-center text-gray-400 italic font-medium bg-gray-50/50">
                       No batch records found yet. Click "Create New Batch" to get started.
                     </td>
                   </tr>
@@ -144,12 +141,141 @@ export default function FillingBatchCreation() {
             </table>
           </div>
         </div>
-      ) : (
+      )}
+
+      {view === 'detail' && viewBatch && (
+        /* ─── DETAIL VIEW ─── */
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-2 h-full bg-sky-500"></div>
+          <button
+            onClick={handleBackToList}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-lg"
+          >
+            ✕
+          </button>
+
+          <div className="pl-4 mb-6">
+            <button onClick={handleBackToList} className="text-sky-600 hover:text-sky-800 text-sm font-semibold flex items-center gap-1 mb-3 transition-colors">
+              ← Back to Batch List
+            </button>
+            <h2 className="text-xl font-bold text-gray-800 mb-1">Batch Details</h2>
+            <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold">Read-only view of batch information</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Batch Number</label>
+              <input type="text" value={viewBatch.batchNumber} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-sky-700 rounded-lg p-2.5 text-sm font-mono font-bold cursor-not-allowed" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Date</label>
+              <input type="text" value={viewBatch.batchDate || '—'} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg p-2.5 text-sm cursor-not-allowed" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Product Type</label>
+              <input type="text" value={viewBatch.productType || '—'} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg p-2.5 text-sm cursor-not-allowed" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Gas Type</label>
+              <input type="text" value={viewBatch.gasType || '—'} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg p-2.5 text-sm cursor-not-allowed" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Filling Station</label>
+              <input type="text" value={viewBatch.fillingStation || '—'} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg p-2.5 text-sm cursor-not-allowed" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Tank ID (Source of Gas)</label>
+              <input type="text" value={viewBatch.tankId || '—'} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg p-2.5 text-sm cursor-not-allowed" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-6 pl-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Operator Name</label>
+              <input type="text" value={viewBatch.operatorName || '—'} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg p-2.5 text-sm cursor-not-allowed" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Shift</label>
+              <input type="text" value={viewBatch.shift || '—'} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-gray-600 rounded-lg p-2.5 text-sm cursor-not-allowed" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+              <div className="mt-1">
+                <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
+                  viewBatch.status === 'Complete'
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>{viewBatch.status}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cylinder Items in this batch */}
+          <div className="pl-4 mt-6">
+            <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+              Cylinders
+              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg text-xs font-bold border border-gray-200/50">{viewBatch.items.length}</span>
+            </h3>
+            {viewBatch.items.length > 0 ? (
+              <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-white border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
+                      <th className="p-3 pl-4">Serial Number</th>
+                      <th className="p-3">Item Status</th>
+                      <th className="p-3">QC Status</th>
+                      <th className="p-3">Inventory Location</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {viewBatch.items.map(item => (
+                      <tr key={item.serialNumber} className="hover:bg-sky-50/20 transition-colors">
+                        <td className="p-3 pl-4 font-mono text-sky-700 font-semibold">{item.serialNumber}</td>
+                        <td className="p-3 text-gray-600">{item.itemStatus || '—'}</td>
+                        <td className="p-3">
+                          {item.qcStatus ? (
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                              item.qcStatus === 'QC Passed'
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : 'bg-red-50 text-red-700 border-red-200'
+                            }`}>{item.qcStatus}</span>
+                          ) : <span className="text-gray-400">—</span>}
+                        </td>
+                        <td className="p-3 text-gray-600">{item.inventoryLocation || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center text-gray-400 italic text-sm">
+                No cylinders added to this batch yet.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === 'create' && (
         /* ─── CREATE VIEW ─── */
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-2 h-full bg-sky-500"></div>
           <button
-            onClick={() => setIsCreating(false)}
+            onClick={handleBackToList}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-lg"
           >
             ✕
@@ -166,16 +292,9 @@ export default function FillingBatchCreation() {
 
           <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Batch Number <span className="text-red-500">*</span></label>
-              <div className="flex gap-2">
-                <input type="text" value={form.batchNumber} onChange={e => handleChange('batchNumber', e.target.value)}
-                  className="flex-1 bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none font-mono"
-                  placeholder="e.g. BATCH-2024-OXY-001" />
-                <button onClick={generateBatchNumber}
-                  className="bg-sky-100 text-sky-700 px-3 rounded-lg text-xs font-semibold hover:bg-sky-200 transition-colors border border-sky-200 whitespace-nowrap">
-                  Auto-Generate
-                </button>
-              </div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Batch Number</label>
+              <input type="text" value={form.batchNumber} disabled
+                className="w-full bg-gray-50 border border-gray-200 text-sky-700 rounded-lg p-2.5 text-sm font-mono font-bold cursor-not-allowed" />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Date <span className="text-red-500">*</span></label>

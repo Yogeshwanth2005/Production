@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Meeting Guide — Production Modules</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            margin: 40px auto; 
+            max-width: 850px; 
+            color: #333; 
+            padding: 0 20px;
+        }
+        h1 { color: #2c3e50; font-size: 2.2em; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #2980b9; margin-top: 40px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        h3 { color: #34495e; margin-top: 25px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #e0e0e0; padding: 12px 15px; text-align: left; }
+        th { background-color: #f8f9fa; color: #2c3e50; font-weight: 600; }
+        .note, .important { padding: 15px; margin: 20px 0; border-radius: 4px; }
+        .note { background-color: #e8f4f8; border-left: 4px solid #3498db; }
+        .important { background-color: #fff3cd; border-left: 4px solid #ffc107; color: #856404; }
+        code { background: #f4f6f7; padding: 2px 6px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9em; color: #e74c3c; }
+        pre code { color: #333; background: transparent; padding: 0; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 6px; overflow-x: auto; border: 1px solid #e9ecef; }
+        .speech-box { background: #fdfefe; border: 1px solid #d5dbdb; border-radius: 6px; padding: 15px; font-style: italic; color: #566573; position: relative; margin: 20px 0; }
+        .speech-box::before { content: "🎤 Talk Track:"; font-weight: bold; font-style: normal; display: block; margin-bottom: 8px; color: #27ae60; }
+        .mermaid { margin: 30px 0; text-align: center; background: #fff; border-radius: 8px; padding: 10px; }
+        @media print {
+            body { margin: 0; max-width: 100%; padding: 20px; }
+            .no-print { display: none; }
+            h2, h3 { page-break-after: avoid; }
+            pre, table, .note, .important, .mermaid { page-break-inside: avoid; }
+        }
+        .header-box { text-align: center; margin-bottom: 40px; }
+        .btn-print { background-color: #3498db; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; display: inline-block; margin-bottom: 20px; font-weight: bold; text-decoration: none;}
+        .btn-print:hover { background-color: #2980b9; }
+    </style>
+    <!-- Include Mermaid.js for rendering diagrams -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</head>
+<body>
+
+    <div class="no-print" style="text-align: center; background-color: #fdf2e9; padding: 15px; border: 1px solid #edbb99; border-radius: 8px; margin-bottom: 30px;">
+        <strong>Instructions:</strong> This page is formatted for printing to PDF.<br>
+        Wait briefly for the diagrams to load, then click the button below or press <code>Ctrl+P</code> to save as PDF.
+        <br><br>
+        <button class="btn-print" onclick="window.print()">💾 Save as PDF</button>
+    </div>
+
+    <div class="header-box">
+        <h1>🎯 Review Meeting Guide</h1>
+        <p style="font-size: 1.2em; color: #7f8c8d;">SOGFusion Production Modules: QC, Safety, and Inventory</p>
+    </div>
+
+    <h2>1. The Big Picture</h2>
+    <p>Your project is called <strong>SOGFusion</strong>, a Production Dashboard for a gas filling plant. Think of it like a restaurant:</p>
+    <ul>
+        <li><strong>The Menu</strong> (React Frontend) &mdash; What you see on screen and interact with.</li>
+        <li><strong>The Kitchen</strong> (Python FastAPI Backend) &mdash; Processes your requests.</li>
+        <li><strong>The Recipe Book</strong> (MySQL Database) &mdash; Permanently stores all the data.</li>
+    </ul>
+
+    <div class="mermaid">
+    graph LR
+        A["🖥️ React Frontend<br/>(Browser)"] -- "HTTP API Calls<br/>(JSON)" --> B["🐍 Python FastAPI Backend<br/>(Server)"]
+        B -- "SQL Queries" --> C["🗄️ MySQL Database<br/>(sogfusion_db)"]
+        C -- "Query Results" --> B
+        B -- "JSON Response" --> A
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #ecf0f1; margin: 40px 0;">
+
+    <h2>2. Quality Check Module</h2>
+    <p>After cylinders are filled, an inspector checks each one. This module allows them to review pending cylinders and submit safety metrics.</p>
+    
+    <div class="speech-box">
+        "After cylinders are filled, the Quality Check module lets the inspector verify each cylinder. They check gas purity percentage, pressure, leakage, and valve condition. Each result is saved to the MySQL database through our FastAPI backend. Once checked, cylinders move to 'QC Passed' or 'QC Failed'."
+    </div>
+
+    <h3>How It Works:</h3>
+    <ul>
+        <li><strong>Filters Data:</strong> Shows only cylinders with <code>itemStatus = 'Produced'</code> (waiting for QC).</li>
+        <li><strong>Records Metrics:</strong> Gas Purity (%), Pressure (Pass/Fail), Leak Test, Valve Condition, and overall QC Decision.</li>
+        <li><strong>Database Action:</strong> clicking "Submit QC" sends a <code>PUT</code> request to update that specific cylinder row in the <code>items</code> table.</li>
+    </ul>
+
+    <div class="mermaid">
+    sequenceDiagram
+        participant User as 👤 Inspector
+        participant React as ⚛️ React
+        participant API as 🐍 FastAPI
+        participant DB as 🗄️ MySQL
+    
+        User->>React: Fills metrics & clicks Submit
+        React->>API: PUT /api/batches/{batch}/items/{serial}
+        API->>DB: UPDATE items SET qc_status='QC Passed'...
+        DB->>API: ✅ Updated
+        API->>React: ✅ Success
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #ecf0f1; margin: 40px 0;">
+
+    <h2>3. Safety Checklist Module</h2>
+    <p>Before filling operations begin, a supervisor audits the station. This is a mandatory compliance form.</p>
+
+    <div class="speech-box">
+        "The Safety Checklist is a compliance module. Before any filling operation, a supervisor verifies 4 mandatory safety checks — equipment condition, safety valves, fire safety, and PPE compliance. If all checks pass, the overall status is 'Passed'. Each submission creates a new distinct record in the database."
+    </div>
+
+    <h3>How It Works:</h3>
+    <ul>
+        <li><strong>Checklist Items:</strong> 4 fixed checks (Equipment, Valves, Fire Safety, PPE).</li>
+        <li><strong>Logic:</strong> If <em>all</em> checks are "OK", the status is "Passed". If <em>any</em> check is "Not OK", it "Failed".</li>
+        <li><strong>Database Action:</strong> Sends a <code>POST</code> request. Unlike QC which updates an item, this inserts a brand <strong>new row</strong> into the <code>safety_checklists</code> table.</li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid #ecf0f1; margin: 40px 0;">
+
+    <h2>4. Move to Filled Inventory Module</h2>
+    <p>The final step. Cylinders that have been tagged are moved from the filling station to the stock yard.</p>
+
+    <div class="speech-box">
+        "This is the final step. After cylinders are sealed and tagged, they move to the stock yard. My module shows all 'Tagged' cylinders, and the operator can move them individually or all at once. Each move records the location, date, and creates a unique transaction ID."
+    </div>
+
+    <h3>How It Works:</h3>
+    <ul>
+        <li><strong>Filters Data:</strong> Shows cylinders with <code>itemStatus = 'Tagged'</code>.</li>
+        <li><strong>Action:</strong> Operator specifies "From" and "To" locations. Can click "Move All" or move one by one.</li>
+        <li><strong>Transaction ID:</strong> Generates a unique ID (e.g., <code>TXN-123456</code>) to group all items moved in that specific session.</li>
+        <li><strong>Database Action:</strong> Updates <code>item_status = 'In Inventory'</code> and records the location.</li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid #ecf0f1; margin: 40px 0;">
+
+    <h2>5. MySQL & Python Integration Deep Dive</h2>
+    <p>This is the 5-layer journey of how data gets from the browser to the database (using a Quality Check submission as an example):</p>
+
+    <ol>
+        <li><strong>React Page:</strong> Inspector clicks "Submit", firing a function with <em>camelCase</em> data (e.g., <code>gasPurity: 99.5</code>).</li>
+        <li><strong>Context (Middleman):</strong> Converts JavaScript <code>camelCase</code> into Python/SQL <code>snake_case</code> (e.g., <code>gas_purity: 99.5</code>) and sends it as JSON via an HTTP API request.</li>
+        <li><strong>FastAPI Route:</strong> Routes in <code>items.py</code> receive the JSON. A <strong>Pydantic Model</strong> strictly validates that the data shapes and types are correct before proceeding.</li>
+        <li><strong>Database Python File:</strong> <code>database.py</code> uses <code>mysql-connector-python</code> to open a connection to the local database.</li>
+        <li><strong>MySQL Execution:</strong> The backend dynamically builds an <code>UPDATE</code> or <code>INSERT</code> query and commits the transaction to the <code>sogfusion_db</code>.</li>
+    </ol>
+
+    <div class="note">
+        <strong>Backend Fix Mention:</strong> If someone asks about CORS, mention: "We configured CORS middleware in main.py to allow our React app running on port 5173 to safely communicate with our Python API on port 8000."
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #ecf0f1; margin: 40px 0;">
+
+    <h2>6. Key Technical Terms Cheat Sheet</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Term</th>
+                <th>Simple Meaning</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>FastAPI</strong></td>
+                <td>The Python framework we used to build our backend server. It's fast and easy to write.</td>
+            </tr>
+            <tr>
+                <td><strong>Endpoint / Route</strong></td>
+                <td>A specific Web URL the backend listens to (e.g., <code>/api/batches</code>).</td>
+            </tr>
+            <tr>
+                <td><strong>Pydantic Model</strong></td>
+                <td>A Python tool we use that checks if data is correct (e.g., ensures purity is a number, not text).</td>
+            </tr>
+            <tr>
+                <td><strong>HTTP Methods</strong></td>
+                <td><code>GET</code> (fetch data), <code>POST</code> (create new data), <code>PUT</code> (update existing data).</td>
+            </tr>
+            <tr>
+                <td><strong>Context (React)</strong></td>
+                <td>A shared data layer in React so different pages can access the same batch information.</td>
+            </tr>
+            <tr>
+                <td><strong>JSON</strong></td>
+                <td>The lightweight text format we use to transport data between React and Python.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        // Optional: trigger print after delay if desired. Currently relying on user clicking the button.
+        // setTimeout(() => { window.print(); }, 2000);
+    </script>
+</body>
+</html>

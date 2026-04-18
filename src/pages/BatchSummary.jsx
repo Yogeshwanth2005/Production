@@ -1,14 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
 
 export default function BatchSummary() {
-  const { batches, productConfig, completeBatch, activeBatch } = useSharedState();
-  const [selectedBatchId, setSelectedBatchId] = useState(null);
-
-  useEffect(() => {
-    // Optionally default to active batch if none selected, but user requested List view. 
-    // We will keep it strictly List view by default.
-  }, []);
+  const { batches, productConfig, completeBatch } = useSharedState();
+  const [viewingBatch, setViewingBatch] = useState(null);
 
   if (!batches) return <div>Loading...</div>;
 
@@ -16,20 +11,21 @@ export default function BatchSummary() {
     completeBatch(batchNumber);
   };
 
-  if (selectedBatchId) {
-    const batch = batches.find(b => b.batchNumber === selectedBatchId);
-    if (!batch) return <div>Loading...</div>;
-    
-    const pConfig = productConfig[batch.productType];
-    const totalItems = batch.items.length;
-    const unprocessedItems = batch.items.filter(i => i.itemStatus === "Issued").length;
-    const processedItems = batch.items.filter(i => i.itemStatus !== "Issued");
-    
+  // Keep viewingBatch in sync with latest data from context
+  const currentBatch = viewingBatch ? batches.find(b => b.batchNumber === viewingBatch.batchNumber) : null;
+
+  // ── DETAIL VIEW ──────────────────────────────────────────────
+  if (currentBatch) {
+    const pConfig = productConfig[currentBatch.productType];
+    const totalItems = currentBatch.items.length;
+    const unprocessedItems = currentBatch.items.filter(i => i.itemStatus === "Issued").length;
+    const processedItems = currentBatch.items.filter(i => i.itemStatus !== "Issued");
+
     const successfulCount = processedItems.filter(i => i.processStatus === "Success").length;
     const rejectedCount = processedItems.filter(i => i.processStatus === "Rejected").length;
 
     const totalNet = processedItems.reduce((acc, curr) => acc + (curr.netOutput || 0), 0);
-    
+
     let expectedNet = 0;
     let variance = 0;
     if(pConfig && pConfig.productName === "Oxygen Gas") {
@@ -40,169 +36,218 @@ export default function BatchSummary() {
       variance = totalNet - expectedNet;
     }
 
-    const isComplete = batch.status === "Complete";
+    const isComplete = currentBatch.status === "Complete";
     const canComplete = unprocessedItems === 0 && !isComplete;
 
     return (
-      <div className="space-y-6 max-w-4xl mx-auto font-sans">
-        <button 
-          onClick={() => setSelectedBatchId(null)}
-          className="text-gray-500 hover:text-gray-800 font-semibold text-sm flex items-center gap-2 mb-2 transition-colors"
-        >
-          <span>←</span> Back to Batch List
-        </button>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 relative overflow-hidden">
-          <div className={`absolute top-0 left-0 w-2 h-full ${isComplete ? 'bg-green-500' : 'bg-primary'}`}></div>
-          <div className="flex justify-between items-start mb-8 border-b border-gray-100 pb-4">
+      <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
+          <div className={`absolute top-0 left-0 w-2 h-full ${isComplete ? 'bg-green-500' : 'bg-indigo-500'}`}></div>
+
+          {/* Back button */}
+          <button
+            onClick={() => setViewingBatch(null)}
+            className="absolute top-4 right-4 flex items-center gap-1.5 text-gray-400 hover:text-gray-700 text-sm font-semibold bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors border border-gray-200"
+          >
+            ← Back to List
+          </button>
+
+          <h2 className="text-xl font-bold text-gray-800 mb-1 pl-4">Batch Summary</h2>
+          <p className="text-xs text-gray-400 pl-4 mb-6 uppercase tracking-widest font-semibold">
+            Review aggregated results before closing the batch
+          </p>
+
+          {/* Batch Header Info */}
+          <div className="grid grid-cols-4 gap-4 mb-6 pl-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Batch Summary</h2>
-              <p className="text-gray-500 mt-1">Review aggregated results before closing the batch.</p>
-            </div>
-            <span className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-widest uppercase border
-              ${isComplete ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-              {batch.status}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-8 mb-8">
-            <div className="space-y-6">
-              <div>
-                <p className="text-sm text-gray-500 font-semibold mb-1">Batch Number</p>
-                <p className="font-mono text-lg font-bold text-gray-800">{batch.batchNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 font-semibold mb-1">Total Items</p>
-                <p className="text-xl font-bold text-gray-800">{totalItems}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 font-semibold mb-1">Items Unprocessed</p>
-                <p className={`text-xl font-bold ${unprocessedItems > 0 ? 'text-amber-500' : 'text-gray-800'}`}>
-                  {unprocessedItems}
-                </p>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Batch Number</label>
+              <div className="bg-indigo-50 border border-indigo-200 font-mono text-indigo-800 rounded-lg p-2.5 text-sm font-bold">
+                {currentBatch.batchNumber}
               </div>
             </div>
-            
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg">
-                  <p className="text-xs text-blue-800 font-bold uppercase tracking-wider mb-1">Actual Output</p>
-                  <p className="text-xl font-mono font-bold text-blue-700">
-                    {totalNet.toFixed(2)} <span className="text-sm opacity-60">{pConfig ? pConfig.outputUnit : ''}</span>
-                  </p>
-                </div>
-                <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg">
-                  <p className="text-xs text-gray-600 font-bold uppercase tracking-wider mb-1">Expected Output</p>
-                  <p className="text-xl font-mono font-bold text-gray-700">
-                    {expectedNet.toFixed(2)} <span className="text-sm opacity-60">{pConfig ? pConfig.outputUnit : ''}</span>
-                  </p>
-                </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Product Type</label>
+              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
+                {pConfig ? pConfig.productName : currentBatch.productType}
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="border border-green-200 p-3 rounded-lg">
-                  <p className="text-xs text-green-700 font-bold uppercase tracking-wider mb-1">Successful</p>
-                  <p className="text-2xl font-bold text-green-600">{successfulCount}</p>
-                </div>
-                <div className="border border-red-200 p-3 rounded-lg">
-                  <p className="text-xs text-red-700 font-bold uppercase tracking-wider mb-1">Rejected</p>
-                  <p className="text-2xl font-bold text-red-600">{rejectedCount}</p>
-                </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Gas Type</label>
+              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
+                {currentBatch.gasType || '—'}
               </div>
-
-              <div>
-                <p className="text-sm text-gray-500 font-semibold mb-1">Variance (Actual - Expected)</p>
-                <div className={`inline-block px-3 py-1 rounded-md border font-mono font-bold tracking-wide
-                  ${variance === 0 ? 'bg-gray-50 text-gray-600 border-gray-200' : 
-                    variance > 0 ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                  {variance > 0 ? '+' : ''}{variance.toFixed(2)} {pConfig ? pConfig.outputUnit : ''}
-                </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
+              <div className="mt-0.5">
+                <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
+                  isComplete
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>{currentBatch.status}</span>
               </div>
             </div>
           </div>
 
-          <div className="pt-6 border-t border-gray-100 flex justify-end">
-            <button 
-              onClick={() => handleComplete(batch.batchNumber)}
-              disabled={!canComplete}
-              className="bg-primary hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white px-8 py-3 rounded-lg font-bold text-lg transition-all shadow-md active:scale-95"
-            >
-              Complete Batch
-            </button>
+
+
+
+          {/* Output Summary */}
+          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Actual Output</label>
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-2.5 text-sm font-mono font-bold">
+                {totalNet.toFixed(2)} <span className="text-xs opacity-60">{pConfig ? pConfig.outputUnit : ''}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Expected Output</label>
+              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-mono font-bold">
+                {expectedNet.toFixed(2)} <span className="text-xs opacity-60">{pConfig ? pConfig.outputUnit : ''}</span>
+              </div>
+            </div>
           </div>
-          
-          {unprocessedItems > 0 && !isComplete && (
-            <p className="text-right text-amber-600 text-sm mt-3 font-medium">
-              Cannot complete batch: {unprocessedItems} item(s) are still pending processing.
-            </p>
-          )}
         </div>
+
+        {/* Cylinders Table */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+              Cylinder Details
+              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-lg text-xs font-bold border border-gray-200/50">{totalItems}</span>
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
+                  <th className="p-4">Serial Number</th>
+                  <th className="p-4">Item Status</th>
+                  <th className="p-4">Process Status</th>
+                  <th className="p-4">Net Output</th>
+                  <th className="p-4 text-center">Indicator</th>
+                  <th className="p-4">QC Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {currentBatch.items.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="p-12 text-center text-gray-400 italic font-medium">
+                      No cylinders in this batch.
+                    </td>
+                  </tr>
+                ) : currentBatch.items.map(item => (
+                  <tr key={item.serialNumber} className="hover:bg-indigo-50/20 transition-colors">
+                    <td className="p-4 font-mono text-indigo-700 font-semibold">{item.serialNumber}</td>
+                    <td className="p-4 text-gray-600 font-medium">{item.itemStatus}</td>
+                    <td className="p-4">
+                      {item.processStatus ? (
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                          item.processStatus === 'Success'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : 'bg-red-50 text-red-700 border-red-200'
+                        }`}>{item.processStatus}</span>
+                      ) : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="p-4 font-mono text-gray-700">
+                      {item.netOutput ? `${item.netOutput.toFixed(2)} ${pConfig ? pConfig.outputUnit : ''}` : '—'}
+                    </td>
+                    <td className="p-4 text-center">
+                      {item.indicator ? (
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                          item.validationColor === 'green' ? 'bg-green-100 text-green-700 border-green-200' :
+                          item.validationColor === 'red' ? 'bg-red-100 text-red-700 border-red-200' :
+                          'bg-amber-100 text-amber-700 border-amber-200'
+                        }`}>{item.indicator}</span>
+                      ) : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="p-4">
+                      {item.qcStatus ? (
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                          item.qcStatus === 'QC Passed'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : item.qcStatus === 'QC Failed'
+                            ? 'bg-red-50 text-red-700 border-red-200'
+                            : 'bg-gray-100 text-gray-600 border-gray-200'
+                        }`}>{item.qcStatus}</span>
+                      ) : <span className="text-gray-400">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+
       </div>
     );
   }
 
-  // --- LIST VIEW ---
+
+  // ── LIST VIEW ──────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-      <div className="flex justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">Batch Logs</h2>
-          <p className="text-sm text-gray-500 mt-1">Select a batch to view its processing summary or complete it.</p>
-        </div>
-      </div>
-
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {batches.length === 0 ? (
-           <div className="p-12 text-center text-gray-500 font-medium">No batches found in the system.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold tracking-wide text-xs uppercase">
-                  <th className="p-4">Batch Number</th>
-                  <th className="p-4">Product Type</th>
-                  <th className="p-4">Total Items</th>
-                  <th className="p-4">Process Progress</th>
-                  <th className="p-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {[...batches].reverse().map(batch => {
-                  const total = batch.items.length;
-                  const processed = batch.items.filter(i => i.itemStatus !== "Issued").length;
-                  
-                  return (
-                    <tr 
-                      key={batch.batchNumber} 
-                      onClick={() => setSelectedBatchId(batch.batchNumber)}
-                      className="hover:bg-blue-50/30 cursor-pointer transition-colors"
-                    >
-                      <td className="p-4 font-mono font-bold text-primary">{batch.batchNumber}</td>
-                      <td className="p-4 font-semibold text-gray-700">{batch.productType}</td>
-                      <td className="p-4 font-medium text-gray-600">{total} cylinders</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-full bg-gray-200 rounded-full h-2 max-w-[100px]">
-                            <div className="bg-primary h-2 rounded-full" style={{ width: total > 0 ? `${(processed/total)*100}%` : '0%' }}></div>
-                          </div>
-                          <span className="text-xs text-gray-500 font-bold">{processed}/{total}</span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                          batch.status === 'Complete'
-                            ? 'bg-green-100 text-green-700 border-green-200'
-                            : 'bg-amber-100 text-amber-700 border-amber-200'
-                        }`}>
-                          {batch.status}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+            <h3 className="font-bold text-gray-800 text-lg">Batch Summary Records</h3>
           </div>
-        )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="bg-white border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
+                <th className="p-4">Batch Number</th>
+                <th className="p-4">Product Type</th>
+                <th className="p-4 text-center">Total Items</th>
+                <th className="p-4 text-center">Processed</th>
+                <th className="p-4">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {batches.length > 0 ? [...batches].reverse().map(batch => {
+                const total = batch.items.length;
+                const processed = batch.items.filter(i => i.itemStatus !== "Issued").length;
+
+                return (
+                  <tr
+                    key={batch.batchNumber}
+                    onClick={() => setViewingBatch(batch)}
+                    className="hover:bg-indigo-50/30 cursor-pointer transition-colors"
+                  >
+                    <td className="p-4">
+                      <span className="font-mono text-indigo-600 font-semibold hover:text-indigo-800 hover:underline underline-offset-2 transition-colors">
+                        {batch.batchNumber}
+                      </span>
+                    </td>
+                    <td className="p-4 font-semibold text-gray-700">{batch.productType}</td>
+                    <td className="p-4 text-center font-bold text-gray-800">
+                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg border border-gray-200/50">{total}</span>
+                    </td>
+                    <td className="p-4 text-center font-bold text-gray-800">
+                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg border border-gray-200/50">{processed}</span>
+                    </td>
+                    <td className="p-4">
+                      <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
+                        batch.status === 'Complete'
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>{batch.status}</span>
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr>
+                  <td colSpan="5" className="p-16 text-center text-gray-400 italic font-medium bg-gray-50/50">
+                    No batches found in the system.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
