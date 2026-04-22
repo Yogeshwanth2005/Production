@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { Search, Plus, Edit3, ArrowLeft, Filter, Download, Activity, Database, CheckCircle2 } from 'lucide-react';
 
 export default function GasProductionEntry() {
   const [entries, setEntries] = useState([]);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isViewOnly, setIsViewOnly] = useState(false);
-  const [filterDate, setFilterDate] = useState('');
+  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [form, setForm] = useState({
-    productionId: `GPE-${Math.floor(100000 + Math.random() * 900000)}`,
+    productionId: '',
     date: new Date().toISOString().split('T')[0],
     plantLocation: '',
     gasType: 'Oxygen',
@@ -28,17 +29,34 @@ export default function GasProductionEntry() {
       const data = await res.json();
       setEntries(data);
     } catch (err) {
-      console.error('Failed to fetch gas production entries:', err);
+      console.error(err);
     }
   };
 
   useEffect(() => { fetchEntries(); }, []);
 
-  const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+  const handleNew = () => {
+    setEditingEntry(null);
+    setForm({
+      productionId: `GPE-${Math.floor(100000 + Math.random() * 900000)}`,
+      date: new Date().toISOString().split('T')[0],
+      plantLocation: '',
+      gasType: 'Oxygen',
+      shift: 'Morning',
+      machineUnit: '',
+      operatorName: '',
+      quantityProduced: '',
+      quantityUnit: 'Kg',
+      purityLevel: '',
+      pressureLevel: '',
+      linkedTankId: '',
+      remarks: '',
+    });
+    setView('form');
   };
 
-  const handleEditClick = (e) => {
+  const handleEdit = (e) => {
+    setEditingEntry(e);
     setForm({
       productionId: e.production_id,
       date: e.date,
@@ -54,9 +72,7 @@ export default function GasProductionEntry() {
       linkedTankId: e.linked_tank_id || '',
       remarks: e.remarks || '',
     });
-    setIsEditing(true);
-    setIsCreating(true);
-    setIsViewOnly(e.approval_status === 'Approved');
+    setView('form');
   };
 
   const handleSubmit = async () => {
@@ -66,6 +82,7 @@ export default function GasProductionEntry() {
     }
 
     const payload = {
+      production_id: form.productionId,
       date: form.date,
       plant_location: form.plantLocation,
       gas_type: form.gasType,
@@ -81,255 +98,193 @@ export default function GasProductionEntry() {
     };
 
     try {
-      if (isEditing) {
-        await fetch(`/api/gas-production/${form.productionId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      } else {
-        await fetch('/api/gas-production', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, production_id: form.productionId, approval_status: 'Pending' })
-        });
-      }
+      const url = editingEntry ? `/api/gas-production/${form.productionId}` : '/api/gas-production';
+      const method = editingEntry ? 'PUT' : 'POST';
       
-      setForm({
-        productionId: `GPE-${Math.floor(100000 + Math.random() * 900000)}`,
-        date: new Date().toISOString().split('T')[0],
-        plantLocation: '', gasType: 'Oxygen', shift: 'Morning',
-        machineUnit: '', operatorName: '', quantityProduced: '',
-        quantityUnit: 'Kg', purityLevel: '', pressureLevel: '',
-        linkedTankId: '', remarks: '',
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingEntry ? payload : { ...payload, approval_status: 'Pending' })
       });
+
       await fetchEntries();
-      setIsCreating(false);
-      setIsEditing(false);
-      setIsViewOnly(false);
+      setView('list');
     } catch (err) {
-      console.error('Failed to create/update entry:', err);
+      console.error(err);
     }
   };
 
-  const handleApprove = async (prodId) => {
-    await fetch(`/api/gas-production/${prodId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approval_status: 'Approved' })
-    });
-    await fetchEntries();
-  };
+  const filteredEntries = entries.filter(e => 
+    e.production_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    e.operator_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const filteredEntries = filterDate ? entries.filter(e => e.date === filterDate) : entries;
+  if (view === 'form') {
+    const isApproved = editingEntry?.approval_status === 'Approved';
+    return (
+      <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+        <div className="p-8 pb-4">
+           <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-xs uppercase tracking-widest mb-4 transition-colors">
+             <ArrowLeft size={14} /> Back to Production Registry
+           </button>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">{editingEntry ? 'Production Record Analysis' : 'New Production Entry'}</h2>
+           <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px] mt-1">Record ID: <span className="text-sky-600">{form.productionId}</span></p>
+        </div>
+
+        <div className="flex-1 p-8 pt-4">
+           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full max-w-6xl">
+              <div className="h-1.5 bg-slate-800 w-full"></div>
+              <div className="p-8">
+                 <div className="grid grid-cols-4 gap-8 mb-12">
+                    <div className="col-span-1">
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Registration Date</label>
+                       <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} disabled={isApproved} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold shadow-sm outline-none focus:ring-4 focus:ring-sky-500/10" />
+                    </div>
+                    <div className="col-span-1">
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Gas Category</label>
+                       <select value={form.gasType} onChange={e => setForm({...form, gasType: e.target.value})} disabled={isApproved} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold shadow-sm outline-none focus:ring-4 focus:ring-sky-500/10">
+                          <option>Oxygen</option>
+                          <option>Nitrogen</option>
+                          <option>Argon</option>
+                       </select>
+                    </div>
+                    <div className="col-span-1">
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Operational Shift</label>
+                       <select value={form.shift} onChange={e => setForm({...form, shift: e.target.value})} disabled={isApproved} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold shadow-sm outline-none focus:ring-4 focus:ring-sky-500/10">
+                          <option>Morning</option>
+                          <option>Evening</option>
+                          <option>Night</option>
+                       </select>
+                    </div>
+                    <div className="col-span-1">
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Plant Location</label>
+                       <input type="text" value={form.plantLocation} onChange={e => setForm({...form, plantLocation: e.target.value})} disabled={isApproved} placeholder="e.g. ASU-Plant Alpha" className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold shadow-sm outline-none focus:ring-4 focus:ring-sky-500/10" />
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-3 gap-12 bg-slate-50/50 p-8 rounded-3xl border border-slate-100 mb-12">
+                    <div className="space-y-6">
+                       <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 mb-4">
+                          <Activity size={14} className="text-sky-600" /> Output Metrics
+                       </h3>
+                       <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Quantity Produced</label>
+                          <div className="flex gap-2">
+                             <input type="number" value={form.quantityProduced} onChange={e => setForm({...form, quantityProduced: e.target.value})} disabled={isApproved} className="flex-1 bg-white border border-slate-200 rounded-xl p-3 text-sm font-black shadow-sm outline-none" />
+                             <select value={form.quantityUnit} onChange={e => setForm({...form, quantityUnit: e.target.value})} disabled={isApproved} className="w-20 bg-white border border-slate-200 rounded-xl p-3 text-xs font-black shadow-sm outline-none">
+                                <option>Kg</option>
+                                <option>Nm3</option>
+                             </select>
+                          </div>
+                       </div>
+                       <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Purity Threshold (%)</label>
+                          <input type="number" value={form.purityLevel} onChange={e => setForm({...form, purityLevel: e.target.value})} disabled={isApproved} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-black shadow-sm outline-none" placeholder="99.9" />
+                       </div>
+                    </div>
+
+                    <div className="space-y-6 border-x border-slate-100 px-12">
+                       <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 mb-4">
+                          <Database size={14} className="text-sky-600" /> Hardware Link
+                       </h3>
+                       <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Machine Unit ID</label>
+                          <input type="text" value={form.machineUnit} onChange={e => setForm({...form, machineUnit: e.target.value})} disabled={isApproved} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-black shadow-sm outline-none" placeholder="e.g. COMP-90" />
+                       </div>
+                       <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Source Tank Reference</label>
+                          <input type="text" value={form.linkedTankId} onChange={e => setForm({...form, linkedTankId: e.target.value})} disabled={isApproved} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-black shadow-sm outline-none" placeholder="TANK-00X" />
+                       </div>
+                    </div>
+
+                    <div className="space-y-6">
+                       <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 mb-4">
+                          <CheckCircle2 size={14} className="text-sky-600" /> Personnel
+                       </h3>
+                       <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Lead Operator Name</label>
+                          <input type="text" value={form.operatorName} onChange={e => setForm({...form, operatorName: e.target.value})} disabled={isApproved} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-black shadow-sm outline-none text-sky-800" />
+                       </div>
+                       <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Operational Remarks</label>
+                          <input type="text" value={form.remarks} onChange={e => setForm({...form, remarks: e.target.value})} disabled={isApproved} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold shadow-sm outline-none" placeholder="Normal Op..." />
+                       </div>
+                    </div>
+                 </div>
+
+                 {!isApproved && (
+                   <div className="flex justify-end gap-4 border-t border-slate-100 pt-8">
+                      <button onClick={() => setView('list')} className="px-8 py-3 rounded-xl text-xs font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 transition-all">Discard</button>
+                      <button onClick={handleSubmit} className="bg-sky-600 text-white px-10 py-3 rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all">Post Record</button>
+                   </div>
+                 )}
+              </div>
+           </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-      {!isCreating ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-6 bg-violet-500 rounded-full"></div>
-              <h3 className="font-bold text-gray-800 text-lg">Gas Production Records</h3>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-semibold text-gray-600">Filter Date:</label>
-                <div className="relative flex items-center">
-                  <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="bg-white border border-gray-300 text-gray-700 rounded-lg p-2 pr-8 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm" />
-                  {filterDate && <button onClick={() => setFilterDate('')} className="absolute right-2 text-gray-400 hover:text-red-500 text-sm font-bold bg-white px-1">✕</button>}
-                </div>
-              </div>
-              <button onClick={() => {
-                setForm({
-                  productionId: `GPE-${Math.floor(100000 + Math.random() * 900000)}`,
-                  date: new Date().toISOString().split('T')[0],
-                  plantLocation: '', gasType: 'Oxygen', shift: 'Morning',
-                  machineUnit: '', operatorName: '', quantityProduced: '',
-                  quantityUnit: 'Kg', purityLevel: '', pressureLevel: '',
-                  linkedTankId: '', remarks: '',
-                });
-                setIsEditing(false);
-                setIsCreating(true);
-                setIsViewOnly(false);
-              }} className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center gap-2">
-                + New Production Entry
-              </button>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+    <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+      <div className="p-8 pb-4 flex justify-between items-end">
+        <div>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Gas Production Registry</h2>
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] mt-1">Atmospheric Separation Logs</p>
+        </div>
+        <div className="flex items-center gap-3">
+           <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search By ID / Operator..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all w-64 shadow-sm"
+              />
+           </div>
+           <button onClick={handleNew} className="bg-slate-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-900 transition-all flex items-center gap-2 shadow-lg uppercase tracking-widest">
+             <Plus size={14} /> New Log
+           </button>
+        </div>
+      </div>
+
+      <div className="flex-1 p-8 pt-4 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
+           <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-white border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
-                  <th className="p-4">Production ID</th>
-                  <th className="p-4">Date</th>
-                  <th className="p-4">Gas Type</th>
-                  <th className="p-4">Quantity</th>
-                  <th className="p-4">Purity %</th>
-                  <th className="p-4">Operator</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right pr-6">Action</th>
+                <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                  <th className="p-5 pl-8 border-r border-slate-700/50">Production ID</th>
+                  <th className="p-5 border-r border-slate-700/50">Volume (Qty)</th>
+                  <th className="p-5 border-r border-slate-700/50">Purity</th>
+                  <th className="p-5 border-r border-slate-700/50">Operator</th>
+                  <th className="p-5 text-right pr-12">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredEntries.length > 0 ? filteredEntries.map(e => (
-                  <tr key={e.production_id} className="hover:bg-violet-50/30 transition-colors">
-                    <td className="p-4 font-mono text-violet-700 font-semibold">
-                      <button onClick={() => handleEditClick(e)} className="hover:underline hover:text-violet-900 cursor-pointer text-left transition-colors font-bold truncate group">
-                        {e.production_id} <span className="opacity-0 group-hover:opacity-100 text-[10px] text-violet-500 ml-1 inline-block uppercase tracking-wider transition-opacity">{e.approval_status === 'Approved' ? '👁 View' : '✎ Edit'}</span>
-                      </button>
+              <tbody className="divide-y divide-slate-100">
+                {filteredEntries.map(e => (
+                  <tr key={e.production_id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="p-5 pl-8 font-mono text-sky-700 font-black">
+                       <button onClick={() => handleEdit(e)} className="hover:underline underline-offset-4 decoration-sky-300">
+                         {e.production_id}
+                       </button>
                     </td>
-                    <td className="p-4 text-gray-600">{e.date}</td>
-                    <td className="p-4 text-gray-700 font-medium">{e.gas_type}</td>
-                    <td className="p-4 font-mono">{e.quantity_produced} {e.quantity_unit}</td>
-                    <td className="p-4 font-mono">{e.purity_level}%</td>
-                    <td className="p-4 text-gray-600">{e.operator_name}</td>
-                    <td className="p-4">
-                      <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
-                        e.approval_status === 'Approved'
-                          ? 'bg-green-50 text-green-700 border-green-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>{e.approval_status}</span>
-                    </td>
-                    <td className="p-4 text-right pr-6">
-                      {e.approval_status === 'Pending' ? (
-                        <button onClick={() => handleApprove(e.production_id)}
-                          className="bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 border border-green-200 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
-                          ✓ Approve
-                        </button>
-                      ) : (
-                        <span className="text-gray-300 text-xs italic">Approved</span>
-                      )}
+                    <td className="p-5 text-slate-600 font-bold">{e.quantity_produced} {e.quantity_unit}</td>
+                    <td className="p-5 text-sky-600 font-black">{e.purity_level}%</td>
+                    <td className="p-5 text-slate-500 font-medium">{e.operator_name}</td>
+                    <td className="p-5 text-right pr-12">
+                       <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded border shadow-sm ${
+                         e.approval_status === 'Approved' ? 'bg-sky-50 text-sky-700 border-sky-100' : 'bg-rose-50 text-rose-700 border-rose-100'
+                       }`}>
+                         {e.approval_status}
+                       </span>
                     </td>
                   </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="8" className="p-16 text-center text-gray-400 italic font-medium bg-gray-50/50">
-                      No production records found {filterDate ? 'for this date' : 'yet'}.
-                    </td>
-                  </tr>
-                )}
+                ))}
               </tbody>
-            </table>
-          </div>
+           </table>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-violet-500"></div>
-          <button onClick={() => { setIsCreating(false); setIsEditing(false); setIsViewOnly(false); }} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-lg">✕</button>
-
-          <h2 className="text-xl font-bold text-gray-800 mb-1 pl-4">
-            {isViewOnly ? 'Gas Production Details (Read-Only)' : isEditing ? 'Edit Gas Production Entry' : 'Gas Production Entry'}
-          </h2>
-          <p className="text-xs text-gray-400 pl-4 mb-6 uppercase tracking-widest font-semibold">
-            {isViewOnly ? 'Viewing approved production data' : isEditing ? 'Update existing records' : 'Record gas generated in plant'}
-          </p>
-
-          <div className="grid grid-cols-4 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Production ID</label>
-              <input type="text" value={form.productionId} readOnly disabled={isViewOnly}
-                className="w-full bg-violet-50 border border-violet-200 font-mono text-violet-800 rounded-lg p-2.5 text-sm disabled:opacity-75" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Date {!isViewOnly && <span className="text-red-500">*</span>}</label>
-              <input type="date" value={form.date} onChange={e => handleChange('date', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Plant / Location {!isViewOnly && <span className="text-red-500">*</span>}</label>
-              <input type="text" value={form.plantLocation} onChange={e => handleChange('plantLocation', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder="e.g. Oxygen Plant A" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Gas Type {!isViewOnly && <span className="text-red-500">*</span>}</label>
-              <select value={form.gasType} onChange={e => handleChange('gasType', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500">
-                <option>Oxygen</option>
-                <option>Nitrogen</option>
-                <option>Argon</option>
-                <option>Hydrogen</option>
-                <option>Acetylene</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Shift {!isViewOnly && <span className="text-red-500">*</span>}</label>
-              <select value={form.shift} onChange={e => handleChange('shift', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500">
-                <option>Morning</option>
-                <option>Evening</option>
-                <option>Night</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Machine / Unit {!isViewOnly && <span className="text-red-500">*</span>}</label>
-              <input type="text" value={form.machineUnit} onChange={e => handleChange('machineUnit', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder="e.g. ASU-01" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Operator Name {!isViewOnly && <span className="text-red-500">*</span>}</label>
-              <input type="text" value={form.operatorName} onChange={e => handleChange('operatorName', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder="Enter operator name" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Linked Tank ID</label>
-              <input type="text" value={form.linkedTankId} onChange={e => handleChange('linkedTankId', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder="e.g. TANK-001" />
-            </div>
-          </div>
-
-          <h3 className="text-sm font-bold text-gray-600 pl-4 mb-3 uppercase tracking-wider border-t border-gray-100 pt-6 mt-2">Production Details</h3>
-          <div className="grid grid-cols-4 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Quantity Produced</label>
-              <div className="flex gap-2">
-                <input type="number" step="0.01" value={form.quantityProduced} onChange={e => handleChange('quantityProduced', e.target.value)} disabled={isViewOnly}
-                  className="flex-1 bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-                  placeholder="0.00" />
-                <select value={form.quantityUnit} onChange={e => handleChange('quantityUnit', e.target.value)} disabled={isViewOnly}
-                  className="w-20 bg-white border border-gray-300 rounded-lg p-2.5 text-sm outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500">
-                  <option>Kg</option>
-                  <option>Liters</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Purity Level (%)</label>
-              <input type="number" step="0.01" value={form.purityLevel} onChange={e => handleChange('purityLevel', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder="e.g. 99.5" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Pressure Level</label>
-              <input type="number" step="0.01" value={form.pressureLevel} onChange={e => handleChange('pressureLevel', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder="e.g. 150" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Remarks</label>
-              <input type="text" value={form.remarks} onChange={e => handleChange('remarks', e.target.value)} disabled={isViewOnly}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-violet-500 outline-none shadow-sm disabled:bg-gray-50 disabled:text-gray-500"
-                placeholder="Optional remarks" />
-            </div>
-          </div>
-
-          {!isViewOnly && (
-            <div className="pl-4 pt-4 border-t border-gray-100 flex justify-end">
-              <button onClick={handleSubmit}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2">
-                {isEditing ? 'Update Production Entry' : 'Submit Production Entry'} <span className="text-xl leading-none">→</span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

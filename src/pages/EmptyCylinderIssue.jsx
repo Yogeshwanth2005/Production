@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { useSharedState } from '../context/SharedStateContext';
+import { Search, Plus, Edit3, ArrowLeft, Truck, Package, MapPin } from 'lucide-react';
 
 export default function EmptyCylinderIssue() {
+  const { batches, fetchBatches } = useSharedState();
+  const [view, setView] = useState('list'); // 'list' or 'form'
   const [issues, setIssues] = useState([]);
-  const [form, setForm] = useState({
-    issueId: `ISS-${Math.floor(100000 + Math.random() * 900000)}`,
-    date: new Date().toISOString().split('T')[0],
-    fromLocation: '',
-    toLocation: '',
-    gasTypePlanned: 'Oxygen',
-  });
-  const [serialInput, setSerialInput] = useState('');
-  const [cylinderType, setCylinderType] = useState('Standard');
-  const [lineItems, setLineItems] = useState([]);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  // View mode: null = list, 'view' = detail view, 'create' = create form
-  const [viewingIssue, setViewingIssue] = useState(null);
+  // Form state
+  const [form, setForm] = useState({
+    issueId: '',
+    date: new Date().toISOString().split('T')[0],
+    fromLocation: 'Stock Yard',
+    toLocation: 'Filling Station A',
+    gasTypePlanned: 'Oxygen',
+    items: []
+  });
 
   const fetchIssues = async () => {
     try {
@@ -24,44 +25,36 @@ export default function EmptyCylinderIssue() {
       const data = await res.json();
       setIssues(data);
     } catch (err) {
-      console.error('Failed to fetch cylinder issues:', err);
+      console.error(err);
     }
   };
 
-  useEffect(() => { fetchIssues(); }, []);
+  useEffect(() => {
+    fetchIssues();
+  }, []);
 
-  const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+  const handleNew = () => {
+    setForm({
+      issueId: `ISSUE-${Date.now().toString().slice(-6)}`,
+      date: new Date().toISOString().split('T')[0],
+      fromLocation: 'Stock Yard',
+      toLocation: 'Filling Station A',
+      gasTypePlanned: 'Oxygen',
+      items: []
+    });
+    setView('form');
   };
 
-  const addLineItem = () => {
-    if (!serialInput.trim()) return;
-    if (lineItems.some(i => i.serial_number === serialInput.trim())) {
-      alert('Cylinder already added');
-      return;
-    }
-    setLineItems(prev => [...prev, {
-      serial_number: serialInput.trim(),
-      cylinder_type: cylinderType,
-      current_status: 'Empty'
-    }]);
-    setSerialInput('');
-  };
-
-  const removeLineItem = (serial) => {
-    setLineItems(prev => prev.filter(i => i.serial_number !== serial));
+  const handleAddItem = (serial) => {
+    if (!serial) return;
+    setForm(prev => ({
+      ...prev,
+      items: [...prev.items, { serial_number: serial, cylinder_type: 'Standard' }]
+    }));
   };
 
   const handleSubmit = async () => {
-    if (!form.fromLocation || !form.toLocation) {
-      alert('Please fill From Location and To Location');
-      return;
-    }
-    if (lineItems.length === 0) {
-      alert('Please add at least one cylinder');
-      return;
-    }
-
+    if (form.items.length === 0) return;
     try {
       await fetch('/api/cylinder-issues', {
         method: 'POST',
@@ -72,334 +65,167 @@ export default function EmptyCylinderIssue() {
           from_location: form.fromLocation,
           to_location: form.toLocation,
           gas_type_planned: form.gasTypePlanned,
-          items: lineItems,
+          items: form.items
         })
       });
-
-      setForm({
-        issueId: `ISS-${Math.floor(100000 + Math.random() * 900000)}`,
-        date: new Date().toISOString().split('T')[0],
-        fromLocation: '', toLocation: '', gasTypePlanned: 'Oxygen',
-      });
-      setLineItems([]);
-      await fetchIssues();
-      setIsCreating(false);
+      fetchIssues();
+      setView('list');
     } catch (err) {
-      console.error('Failed to create issue:', err);
+      alert("Submission failed");
     }
   };
 
-  const filteredIssues = issues;
-
-  // ── VIEW MODE ──────────────────────────────────────────────────
-  if (viewingIssue) {
+  if (view === 'form') {
     return (
-      <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-orange-500"></div>
-
-          {/* Back button */}
-          <button
-            onClick={() => setViewingIssue(null)}
-            className="absolute top-4 right-4 flex items-center gap-1.5 text-gray-400 hover:text-gray-700 text-sm font-semibold bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors border border-gray-200"
-          >
-            ← Back to List
-          </button>
-
-          <h2 className="text-xl font-bold text-gray-800 mb-1 pl-4">Issue Details</h2>
-          <p className="text-xs text-gray-400 pl-4 mb-6 uppercase tracking-widest font-semibold">
-            Cylinder Issue Record
-          </p>
-
-          {/* Header fields (read-only) */}
-          <div className="grid grid-cols-3 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Issue ID</label>
-              <div className="bg-orange-50 border border-orange-200 font-mono text-orange-800 rounded-lg p-2.5 text-sm font-bold">
-                {viewingIssue.issue_id}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Date</label>
-              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
-                {viewingIssue.date}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Gas Type Planned</label>
-              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
-                {viewingIssue.gas_type_planned}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">From Location</label>
-              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
-                {viewingIssue.from_location}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">To Location</label>
-              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">
-                {viewingIssue.to_location}
-              </div>
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div className="flex items-center gap-4 pl-4 mb-6">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Cylinders:</span>
-              <span className="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-orange-200">
-                {viewingIssue.items.length}
-              </span>
-            </div>
-          </div>
-
-          {/* Cylinders table */}
-          <div className="pl-4">
-            <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider mb-3 border-t border-gray-100 pt-5">
-              Line Items — Cylinders
-            </h3>
-            {viewingIssue.items.length === 0 ? (
-              <div className="text-sm text-gray-400 italic border-2 border-dashed border-gray-200 rounded-xl p-8 text-center bg-gray-50/50">
-                No cylinders in this issue.
-              </div>
-            ) : (
-              <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-white border-b border-gray-200 text-gray-500 text-xs uppercase tracking-widest font-bold">
-                      <th className="p-3 pl-4">#</th>
-                      <th className="p-3">Serial Number</th>
-                      <th className="p-3">Cylinder Type</th>
-                      <th className="p-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {viewingIssue.items.map((item, idx) => (
-                      <tr key={item.serial_number} className="hover:bg-white transition-colors">
-                        <td className="p-3 pl-4 text-gray-400 font-mono text-xs">{idx + 1}</td>
-                        <td className="p-3 font-mono text-orange-700 font-bold tracking-tight">{item.serial_number}</td>
-                        <td className="p-3 text-gray-600 font-medium">{item.cylinder_type}</td>
-                        <td className="p-3">
-                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md text-xs font-bold border border-gray-200/50">
-                            {item.current_status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+      <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+        <div className="p-8 pb-4">
+           <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-xs uppercase tracking-widest mb-4 transition-colors">
+             <ArrowLeft size={14} /> Back to Issue Registry
+           </button>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Logistics Issue Voucher</h2>
+           <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px] mt-1">Voucher ID: <span className="text-sky-600 font-black">{form.issueId}</span></p>
         </div>
-      </div>
-    );
-  }
 
-  // ── CREATE MODE ────────────────────────────────────────────────
-  if (isCreating) {
-    return (
-      <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-orange-500"></div>
-          <button onClick={() => setIsCreating(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-lg">✕</button>
+        <div className="flex-1 p-8 pt-4">
+           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full max-w-6xl">
+              <div className="h-1.5 bg-slate-800 w-full"></div>
+              <div className="p-8 grid grid-cols-3 gap-8">
+                 <div className="col-span-2 space-y-6">
+                    <div className="grid grid-cols-2 gap-6">
+                       <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Discharge Location</label>
+                          <input type="text" value={form.fromLocation} onChange={e => setForm({...form, fromLocation: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold shadow-sm" />
+                       </div>
+                       <div>
+                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Target Station</label>
+                          <input type="text" value={form.toLocation} onChange={e => setForm({...form, toLocation: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold shadow-sm" />
+                       </div>
+                    </div>
 
-          <h2 className="text-xl font-bold text-gray-800 mb-1 pl-4">Empty Cylinder Issue to Filling</h2>
-          <p className="text-xs text-gray-400 pl-4 mb-6 uppercase tracking-widest font-semibold">Move empty cylinders → filling station</p>
+                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                       <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2">
+                          <Package size={16} className="text-sky-600" /> Itemized Cargo List
+                       </h3>
+                       <div className="flex gap-2 mb-4">
+                          <input 
+                            type="text" 
+                            id="newSerial"
+                            placeholder="Scan/Enter Serial..."
+                            className="flex-1 bg-white border border-slate-200 rounded-xl p-2.5 text-sm font-mono shadow-inner outline-none focus:ring-2 focus:ring-sky-500"
+                            onKeyDown={e => { if(e.key === 'Enter') { handleAddItem(e.currentTarget.value); e.currentTarget.value = ''; } }}
+                          />
+                          <button 
+                            onClick={() => { const el = document.getElementById('newSerial'); handleAddItem(el.value); el.value = ''; }}
+                            className="bg-sky-600 text-white px-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-sky-700 transition-all font-sans"
+                          >
+                            Add Unit
+                          </button>
+                       </div>
+                       <div className="space-y-2 max-h-60 overflow-auto pr-2">
+                          {form.items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm animate-in zoom-in-95 duration-200">
+                               <span className="text-sm font-mono font-bold text-slate-600">{item.serial_number}</span>
+                               <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Empty / {form.gasTypePlanned}</span>
+                            </div>
+                          ))}
+                          {form.items.length === 0 && <p className="text-center text-slate-400 text-xs italic py-8">Scanner Queue Empty</p>}
+                       </div>
+                    </div>
+                 </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Issue ID</label>
-              <input type="text" value={form.issueId} readOnly
-                className="w-full bg-orange-50 border border-orange-200 font-mono text-orange-800 rounded-lg p-2.5 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Date <span className="text-red-500">*</span></label>
-              <input type="date" value={form.date} onChange={e => handleChange('date', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Gas Type Planned <span className="text-red-500">*</span></label>
-              <select value={form.gasTypePlanned} onChange={e => handleChange('gasTypePlanned', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm">
-                <option>Oxygen</option>
-                <option>Nitrogen</option>
-                <option>Argon</option>
-                <option>Hydrogen</option>
-                <option>Acetylene</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">From Location <span className="text-red-500">*</span></label>
-              <input type="text" value={form.fromLocation} onChange={e => handleChange('fromLocation', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm"
-                placeholder="e.g. Empty Yard / Warehouse" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">To Location <span className="text-red-500">*</span></label>
-              <input type="text" value={form.toLocation} onChange={e => handleChange('toLocation', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm"
-                placeholder="e.g. Filling Station A" />
-            </div>
-          </div>
-
-          {/* Line Items */}
-          <div className="pl-4 mb-6">
-            <div className="flex items-center justify-between mb-3 border-t border-gray-100 pt-6">
-              <h3 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Line Items — Cylinders</h3>
-              {!showAddForm && (
-                <button onClick={() => setShowAddForm(true)} className="bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 px-4 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm">
-                  + Add Cylinder
-                </button>
-              )}
-            </div>
-
-            {lineItems.length > 0 ? (
-              <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden mb-4">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-white border-b border-gray-200 text-gray-500 text-xs uppercase tracking-widest font-bold">
-                      <th className="p-3 pl-4">#</th>
-                      <th className="p-3">Serial Number</th>
-                      <th className="p-3">Cylinder Type</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right pr-4">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {lineItems.map((item, idx) => (
-                      <tr key={item.serial_number} className="hover:bg-white transition-colors">
-                        <td className="p-3 pl-4 text-gray-400 font-mono text-xs">{idx + 1}</td>
-                        <td className="p-3 font-mono text-orange-700 font-bold tracking-tight">{item.serial_number}</td>
-                        <td className="p-3 text-gray-600 font-medium">{item.cylinder_type}</td>
-                        <td className="p-3">
-                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-md text-xs font-bold border border-gray-200/50">
-                            {item.current_status}
-                          </span>
-                        </td>
-                        <td className="p-3 text-right pr-4">
-                          <button onClick={() => removeLineItem(item.serial_number)}
-                            className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg text-xs font-bold transition-colors">✕ Remove</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-400 italic mb-4 border-2 border-dashed border-gray-200 rounded-xl p-8 text-center bg-gray-50/50">
-                No cylinders added yet. Click "+ Add Cylinder" to begin.
-              </div>
-            )}
-
-            {showAddForm && (
-              <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4 relative shadow-sm">
-                <button onClick={() => setShowAddForm(false)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 font-bold bg-gray-50 hover:bg-gray-100 rounded-lg p-1.5 transition-colors">✕</button>
-                <h4 className="text-[11px] font-bold text-gray-400 mb-3 uppercase tracking-widest">Add New Cylinder</h4>
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">Cylinder Serial Number</label>
-                    <input type="text" value={serialInput} onChange={e => setSerialInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && serialInput.trim()) { addLineItem(); setShowAddForm(false); } }}
-                      className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none font-mono uppercase transition-all shadow-inner"
-                      placeholder="e.g. OXY-CYL-0101" autoFocus />
-                  </div>
-                  <div className="w-48">
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">Cylinder Type</label>
-                    <select value={cylinderType} onChange={e => setCylinderType(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all shadow-inner">
-                      <option>Standard</option>
-                      <option>Jumbo</option>
-                      <option>Small</option>
-                      <option>Medical</option>
-                    </select>
-                  </div>
-                  <button onClick={() => { addLineItem(); setShowAddForm(false); }} disabled={!serialInput.trim()}
-                    className="bg-gray-800 hover:bg-gray-900 shadow-sm disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap">
-                    Save Cylinder
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <p className="text-[11px] text-gray-500 mt-2 font-medium bg-orange-50/50 inline-block px-3 py-1.5 rounded-md border border-orange-100">
-              Only <strong>Empty</strong> cylinders allowed for issue to filling.
-            </p>
-          </div>
-
-          <div className="pl-4 pt-4 border-t border-gray-100 flex justify-end">
-            <button onClick={handleSubmit}
-              className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2">
-              Submit Issue Form <span className="text-xl leading-none">→</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── LIST MODE ──────────────────────────────────────────────────
-  return (
-    <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="w-1.5 h-6 bg-orange-500 rounded-full"></div>
-            <h3 className="font-bold text-gray-800 text-lg">Cylinder Issue Records</h3>
-          </div>
-          <button onClick={() => setIsCreating(true)} className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center gap-2">
-            + Create New Issue
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-white border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
-                <th className="p-4">Issue ID</th>
-                <th className="p-4">Date</th>
-                <th className="p-4">From → To</th>
-                <th className="p-4">Gas Type</th>
-                <th className="p-4 text-center">Cylinders</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredIssues.length > 0 ? filteredIssues.map(iss => (
-                <tr key={iss.issue_id} className="hover:bg-orange-50/30 transition-colors group">
-                  {/* Clickable Issue ID */}
-                  <td className="p-4">
-                    <button
-                      onClick={() => setViewingIssue(iss)}
-                      className="font-mono text-orange-600 font-semibold hover:text-orange-800 hover:underline underline-offset-2 transition-colors text-left"
+                 <div className="space-y-8 pl-8 border-l border-slate-100">
+                    <div>
+                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Planned Gas Type</label>
+                       <select value={form.gasTypePlanned} onChange={e => setForm({...form, gasTypePlanned: e.target.value})} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-sky-500">
+                          <option>Oxygen</option>
+                          <option>Nitrogen</option>
+                          <option>Argon</option>
+                       </select>
+                    </div>
+                    <div className="pt-8">
+                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 text-center">Gross Units Found</div>
+                       <div className="text-5xl font-black text-slate-800 text-center">{form.items.length}</div>
+                    </div>
+                    <button 
+                      onClick={handleSubmit}
+                      className="w-full bg-slate-800 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200"
                     >
-                      {iss.issue_id}
+                       Confirm Issue
                     </button>
-                  </td>
-                  <td className="p-4 text-gray-600">{iss.date}</td>
-                  <td className="p-4 text-gray-700">{iss.from_location} <span className="text-gray-300 mx-1">→</span> {iss.to_location}</td>
-                  <td className="p-4 text-gray-600 font-medium">{iss.gas_type_planned}</td>
-                  <td className="p-4 text-center font-bold text-gray-800">
-                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg border border-gray-200/50">{iss.items.length}</span>
-                  </td>
+                 </div>
+              </div>
+           </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+      <div className="p-8 pb-4 flex justify-between items-end">
+        <div>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Cylinder Logistics Registry</h2>
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] mt-1">Empty Stock Transfer Logs</p>
+        </div>
+        <div className="flex items-center gap-3">
+           <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search Issue ID..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all w-64 shadow-sm"
+              />
+           </div>
+           <button onClick={handleNew} className="bg-sky-600 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-sky-700 transition-all flex items-center gap-2 shadow-lg uppercase tracking-widest">
+             <Plus size={14} /> Create Issue
+           </button>
+        </div>
+      </div>
+
+      <div className="flex-1 p-8 pt-4 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
+           <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                  <th className="p-5 pl-8 border-r border-slate-700/50">Issue ID</th>
+                  <th className="p-5 border-r border-slate-700/50">Location Path</th>
+                  <th className="p-5 border-r border-slate-700/50 text-center">Unit Count</th>
+                  <th className="p-5 border-r border-slate-700/50">Timestamp</th>
+                  <th className="p-5 text-right pr-12">Status</th>
                 </tr>
-              )) : (
-                <tr>
-                  <td colSpan="5" className="p-16 text-center text-gray-400 italic font-medium bg-gray-50/50">
-                    No issue records found yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {issues.map(issue => (
+                  <tr key={issue.issue_id} className="hover:bg-slate-50 transition-colors group">
+                    <td className="p-5 pl-8 font-mono text-sky-700 font-black">{issue.issue_id}</td>
+                    <td className="p-5">
+                       <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                          {issue.from_location} <ChevronRight size={10} className="text-slate-300" /> {issue.to_location}
+                       </div>
+                    </td>
+                    <td className="p-5 text-center">
+                       <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-black border border-slate-200/50">
+                          {issue.items?.length || 0}
+                       </span>
+                    </td>
+                    <td className="p-5 text-[11px] text-slate-400 font-bold uppercase">{issue.date}</td>
+                    <td className="p-5 text-right pr-12">
+                       <span className="bg-sky-50 text-sky-700 border border-sky-100 px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest shadow-sm">
+                          {issue.status}
+                       </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+           </table>
         </div>
       </div>
     </div>
   );
+}
+
+function ChevronRight({ size, className }) {
+   return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>
 }

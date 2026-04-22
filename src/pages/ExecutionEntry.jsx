@@ -1,324 +1,240 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
+import { Search, Edit3, ArrowLeft, Filter, Download, Package, Layers, Clipboard } from 'lucide-react';
 
 export default function ExecutionEntry() {
-  const {
-    batches,
-    activeBatch,
-    activeBatchNumber,
-    setActiveBatchNumber,
-    activeProductConfig,
-    productConfig,
-    updateItemInBatch,
-    addItemToBatch
-  } = useSharedState();
+  const { batches, updateItemInBatch } = useSharedState();
+  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [activeBatch, setBatchForExecution] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedSerials, setSelectedSerials] = useState([]);
-  const [allIssues, setAllIssues] = useState([]);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedBatch, setSelectedBatch] = useState('');
-
-  useEffect(() => {
-    const fetchCylinders = async () => {
-      try {
-        const res = await fetch('/api/cylinder-issues');
-        if (res.ok) {
-          const issues = await res.json();
-          setAllIssues(issues);
-        }
-      } catch (err) {
-        console.error("Failed to load cylinders", err);
-      }
-    };
-    fetchCylinders();
-  }, []);
-
-  // When activeBatchNumber updates externally (e.g. from topbar), sync local state
-  useEffect(() => {
-    if (activeBatchNumber) {
-      setSelectedBatch(activeBatchNumber);
-    }
-  }, [activeBatchNumber]);
-
-  // Reset cylinder selection when batch changes
-  useEffect(() => {
-    setSelectedSerials([]);
-    setIsDropdownOpen(false);
-  }, [selectedBatch]);
-
-  const handleBatchChange = (batchNum) => {
-    setSelectedBatch(batchNum);
-    setActiveBatchNumber(batchNum);
+  const handleExecutionInitiate = (batch) => {
+    setBatchForExecution(batch);
+    setView('form');
   };
 
-  // Derive the selected batch data and its config
-  const currentBatch = batches.find(b => b.batchNumber === selectedBatch);
-  const currentConfig = currentBatch ? productConfig[currentBatch.productType] : null;
-
-  const hasBatchSelected = !!currentBatch && !!currentConfig;
-  const isReadOnly = currentBatch?.status === "Complete";
-  const itemsToProcess = currentBatch ? currentBatch.items.filter(item => item.itemStatus === "Issued") : [];
-
-  // All serials already used in ANY batch across the system
-  const usedInAnyBatch = new Set(
-    batches.flatMap(b => b.items.map(i => i.serialNumber))
+  const filteredBatches = batches.filter(b => 
+    b.batchNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Filter: matching product type AND not already in any batch
-  const availableCylinders = (() => {
-    if (!currentBatch) return [];
-    const batchType = currentBatch.productType.toUpperCase();
-    const matchingIssues = allIssues.filter(iss =>
-      iss.gas_type_planned.toUpperCase().includes(batchType) ||
-      batchType.includes(iss.gas_type_planned.toUpperCase())
-    );
-    const serials = matchingIssues.flatMap(iss => iss.items.map(i => i.serial_number));
-    return [...new Set(serials)].filter(serial => !usedInAnyBatch.has(serial));
-  })();
+  if (view === 'form' && activeBatch) {
+    const items = activeBatch.items;
+    const completedCount = items.filter(i => i.itemStatus === 'Produced').length;
 
-  const toggleSerial = (serial) => {
-    if (selectedSerials.includes(serial)) {
-      setSelectedSerials(prev => prev.filter(s => s !== serial));
-    } else {
-      setSelectedSerials(prev => [...prev, serial]);
-    }
-  };
-
-  const handleAddMultiple = async () => {
-    if (selectedSerials.length === 0 || !currentBatch) return;
-    
-    try {
-      for (const serial of selectedSerials) {
-        if (!currentBatch.items.find(i => i.serialNumber === serial)) {
-          await addItemToBatch(currentBatch.batchNumber, serial);
-        }
-      }
-      setSelectedSerials([]);
-      setIsDropdownOpen(false);
-    } catch (err) {
-      alert("Error adding cylinder: " + err.message);
-    }
-  };
-
-  return (
-    <div className="space-y-6 max-w-[1200px] mx-auto">
-
-      {/* Process Execution Details — Batch Selector */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-primary"></div>
-        <h2 className="text-lg font-bold text-gray-800 mb-6 border-b border-gray-100 pb-3 font-sans">Process Execution Details</h2>
-        <div className="grid grid-cols-4 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Batch Number <span className="text-red-500">*</span></label>
-            <select
-              value={selectedBatch}
-              onChange={e => handleBatchChange(e.target.value)}
-              className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all font-sans font-medium cursor-pointer"
-            >
-              <option value="">-- Select a Batch --</option>
-              {batches.map(b => (
-                <option key={b.batchNumber} value={b.batchNumber}>
-                  {b.batchNumber} ({b.productType})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Date <span className="text-red-500">*</span></label>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              disabled={!hasBatchSelected || isReadOnly}
-              className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all font-sans disabled:bg-gray-50 disabled:cursor-not-allowed"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Product Type <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              disabled
-              value={currentConfig ? currentConfig.productName : '—'}
-              className="w-full bg-gray-50 border border-gray-200 text-gray-500 rounded-lg p-2.5 text-sm cursor-not-allowed font-medium font-sans"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Process Method</label>
-            <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
-              <button disabled className="flex-1 bg-white shadow-sm text-primary font-medium text-sm py-1.5 rounded-md cursor-default border border-gray-200/50">
-                {currentConfig ? currentConfig.processMethod : '—'}
-              </button>
-            </div>
-          </div>
+    return (
+      <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+        <div className="p-8 pb-4">
+           <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-xs uppercase tracking-widest mb-4 transition-colors">
+             <ArrowLeft size={14} /> Back to Process Registry
+           </button>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight">PROCESS EXECUTION ENTRY</h2>
+           <div className="flex items-center gap-4 mt-1">
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px]">Batch: <span className="text-sky-600">{activeBatch.batchNumber}</span></p>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase text-white ${activeBatch.isPosted ? 'bg-sky-600' : 'bg-rose-600'}`}>
+                {activeBatch.status}
+              </span>
+           </div>
         </div>
-      </div>
 
-      {/* Show everything below only when a batch is selected */}
-      {hasBatchSelected && (
-        <>
-          {/* Cylinder Selector */}
-          {!isReadOnly && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex gap-4 items-end relative">
-              <div className="flex-1 relative">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Select Cylinders to Process</label>
-                  
-                  <div 
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="w-full bg-white border border-gray-300 rounded-lg p-2 min-h-[46px] text-sm cursor-pointer flex justify-between items-center hover:border-primary transition-colors shadow-sm"
-                  >
-                    <div className="flex flex-wrap gap-1.5 flex-1 items-center">
-                      {selectedSerials.length === 0 ? (
-                        <span className="font-sans text-gray-500 ml-1">-- Select issued empty cylinders --</span>
-                      ) : (
-                        selectedSerials.map(serial => (
-                          <span key={serial} className="flex items-center gap-1.5 bg-gray-100 text-gray-600 px-2.5 py-1 rounded-md text-xs font-mono font-bold border border-gray-200 shadow-sm transition-colors hover:bg-gray-50">
-                            {serial}
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); toggleSerial(serial); }} 
-                              className="text-gray-400 hover:text-red-500 hover:bg-gray-200 rounded-full w-5 h-5 flex items-center justify-center font-bold pb-0.5 leading-none cursor-pointer transition-colors"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))
-                      )}
-                    </div>
-                    <span className={`text-gray-400 px-2 transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
-                  </div>
-
-                  {isDropdownOpen && (
-                    <div className="absolute z-50 w-full mt-2 border border-gray-200 rounded-lg max-h-56 overflow-y-auto bg-white shadow-xl">
-                        {availableCylinders.length === 0 ? (
-                          <div className="text-gray-400 text-sm italic p-4 text-center bg-gray-50">No available empty cylinders found from issues.</div>
-                        ) : availableCylinders
-                          .map(serial => (
-                            <label key={serial} className="flex items-center gap-3 p-3 hover:bg-blue-50/80 cursor-pointer border-b border-gray-100 last:border-0 transition-colors">
-                              <input 
-                                type="checkbox" 
-                                checked={selectedSerials.includes(serial)}
-                                onChange={() => toggleSerial(serial)}
-                                className="w-4.5 h-4.5 text-primary bg-white border-gray-300 rounded focus:ring-primary cursor-pointer"
-                              />
-                              <span className="font-mono text-sm text-gray-700 font-bold uppercase tracking-wide">{serial}</span>
-                            </label>
-                        ))}
-                    </div>
-                  )}
+        <div className="flex-1 p-8 pt-4 space-y-6">
+           {/* Header Info */}
+           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm grid grid-cols-4 gap-8">
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target Product</span>
+                 <span className="text-sm font-black text-slate-800">{activeBatch.productType}</span>
               </div>
-              <button onClick={handleAddMultiple} disabled={selectedSerials.length === 0} className="bg-primary hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white px-8 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm whitespace-nowrap">
-                Add {selectedSerials.length > 0 ? `(${selectedSerials.length}) ` : ''}to Batch
-              </button>
-            </div>
-          )}
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Inventory</span>
+                 <span className="text-sm font-black text-slate-800">{items.length} Units</span>
+              </div>
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Execution Progress</span>
+                 <span className="text-sm font-black text-sky-600">{completedCount} / {items.length}</span>
+              </div>
+              <div className="flex flex-col items-end justify-center">
+                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-sky-600 h-full transition-all duration-500" style={{ width: `${(completedCount / items.length) * 100}%` }}></div>
+                 </div>
+              </div>
+           </div>
 
-          {/* Items Table */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm font-sans">
+           {/* Items Table */}
+           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold tracking-wide text-xs uppercase">
-                    <th className="p-4">Serial Number</th>
-                    <th className="p-4">{currentConfig.inputLabel}</th>
-                    <th className="p-4">{currentConfig.outputLabel}</th>
-                    <th className="p-4">Net Output</th>
-                    <th className="p-4 text-center">Indicator</th>
-                    <th className="p-4 text-right">Action</th>
+                  <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                    <th className="p-5 pl-8 border-r border-slate-700/50 w-1/4">Serial Number</th>
+                    <th className="p-5 border-r border-slate-700/50 w-1/4">Input Value</th>
+                    <th className="p-5 border-r border-slate-700/50 w-1/4">Output Value</th>
+                    <th className="p-5 text-right pr-8 w-1/4">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {itemsToProcess.length === 0 ? (
+                <tbody className="divide-y divide-slate-100">
+                  {items.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="p-12 text-center text-gray-500 font-medium">
-                        <div className="flex flex-col items-center justify-center space-y-2">
-                          <p>All items processed or no issued items found in this batch.</p>
-                        </div>
-                      </td>
+                      <td colSpan="4" className="p-20 text-center text-slate-400 font-bold italic uppercase tracking-widest">No Cylinders Assigned to this Batch</td>
                     </tr>
-                  ) : itemsToProcess.map((item) => (
-                    <RowItem key={item.serialNumber} item={item} config={currentConfig} date={date} isReadOnly={isReadOnly} batchNum={currentBatch.batchNumber} updateFn={updateItemInBatch} />
+                  ) : items.map(item => (
+                    <ExecutionRow 
+                      key={item.serialNumber} 
+                      item={item} 
+                      batchNum={activeBatch.batchNumber} 
+                      isBatchPosted={activeBatch.isPosted}
+                      updateFn={updateItemInBatch} 
+                    />
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Prompt to select batch */}
-      {!hasBatchSelected && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex flex-col items-center justify-center p-16 text-center">
-            <div className="h-14 w-14 rounded-full bg-blue-50 flex items-center justify-center text-2xl mb-4 border border-blue-100">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="M3 8l4-4 4 4"/><path d="M7 4v16"/></svg>
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Select a Batch to Begin</h3>
-            <p className="text-gray-500 text-sm max-w-md">
-              Choose a batch number from the dropdown above to view its cylinders and start the process execution entry.
-            </p>
-          </div>
+           </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+      <div className="p-8 pb-4 flex justify-between items-end">
+        <div>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Process Execution Registry</h2>
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] mt-1">Real-time Filling Monitoring</p>
+        </div>
+        <div className="flex items-center gap-3">
+           <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search Active Batch..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all w-64 shadow-sm"
+              />
+           </div>
+        </div>
+      </div>
+
+      <div className="flex-1 p-8 pt-4 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
+           <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                  <th className="p-5 pl-8 border-r border-slate-700/50">Batch ID</th>
+                  <th className="p-5 border-r border-slate-700/50">Progress</th>
+                  <th className="p-5 border-r border-slate-700/50">Work Station</th>
+                  <th className="p-5 border-r border-slate-700/50 text-center">Status</th>
+                  <th className="p-5 text-right pr-12">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredBatches.map(batch => {
+                  const completed = batch.items.filter(i => i.itemStatus === 'Produced').length;
+                  const total = batch.items.length;
+                  const progress = total > 0 ? (completed / total) * 100 : 0;
+
+                  return (
+                    <tr key={batch.batchNumber} className="hover:bg-slate-50 transition-colors group">
+                      <td className="p-5 pl-8 font-mono text-sky-700 font-black">
+                        <button onClick={() => handleExecutionInitiate(batch)} className="hover:underline underline-offset-4 decoration-sky-300">
+                          {batch.batchNumber}
+                        </button>
+                      </td>
+                      <td className="p-5">
+                          <div className="flex items-center gap-3">
+                             <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-sky-600 h-full" style={{ width: `${progress}%` }}></div>
+                             </div>
+                             <span className="text-[10px] font-black text-slate-400">{Math.round(progress)}%</span>
+                          </div>
+                      </td>
+                      <td className="p-5 text-slate-600 font-bold">{batch.fillingStation || 'STN-?'}</td>
+                      <td className="p-5 text-center">
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-[9px] font-black text-white ${batch.isPosted ? 'bg-sky-600' : 'bg-rose-600'}`}>
+                          {batch.statusTab}
+                        </span>
+                      </td>
+                      <td className="p-5 text-right pr-8">
+                        <button 
+                          onClick={() => handleExecutionInitiate(batch)}
+                          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all shadow-sm"
+                        >
+                          Execute
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+           </table>
+        </div>
+      </div>
     </div>
   );
 }
 
-function RowItem({ item, config, date, isReadOnly, batchNum, updateFn }) {
-  const [inp, setInp] = useState("");
-  const [outp, setOutp] = useState("");
+function ExecutionRow({ item, batchNum, isBatchPosted, updateFn }) {
+  const [inputVal, setInputVal] = useState(item.inputValue || '');
+  const [outputVal, setOutputVal] = useState(item.outputValue || '');
+  const [isEditing, setIsEditing] = useState(item.itemStatus !== 'Produced');
 
-  const handleProcess = () => {
-    if (inp === "" || outp === "") return;
-    const net = config.calculateNet(inp, outp);
-    const validation = config.validateProcess(net);
-
-    updateFn(batchNum, item.serialNumber, {
-      inputValue: Number(inp),
-      outputValue: Number(outp),
-      netOutput: net,
-      indicator: validation.indicator,
-      processStatus: validation.status, // Success / Rejected
-      itemStatus: "Produced", // moves it to next stage
-      productionDate: date,
-      qcStatus: "Pending QC", // will be handled in Quality Check Entry screen
-      validationColor: validation.color
-    });
+  const handleSubmit = async () => {
+    if (inputVal === '' || outputVal === '') return;
+    try {
+      await updateFn(batchNum, item.serialNumber, {
+        inputValue: Number(inputVal),
+        outputValue: Number(outputVal),
+        netOutput: Number(outputVal) - Number(inputVal),
+        itemStatus: 'Produced',
+        productionDate: new Date().toISOString().split('T')[0]
+      });
+      setIsEditing(false);
+    } catch (err) {
+      alert("Execution Failed");
+    }
   };
 
-  const currentNet = (inp !== "" && outp !== "") ? config.calculateNet(inp, outp) : "-";
-  let curVal = null;
-  if (currentNet !== "-") curVal = config.validateProcess(currentNet);
+  const isLocked = isBatchPosted;
 
   return (
-    <tr className="hover:bg-blue-50/20 transition-colors">
-      <td className="p-4 font-mono text-primary font-semibold">{item.serialNumber}</td>
-      <td className="p-4">
-        <input type="number" disabled={isReadOnly} value={inp} onChange={e => setInp(e.target.value)} className="w-32 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow" placeholder="0.00" />
+    <tr className={`hover:bg-slate-50/50 transition-colors ${!isEditing ? 'bg-sky-50/10' : ''}`}>
+      <td className="p-5 pl-8 font-mono text-slate-700 font-bold">
+        <div className="flex items-center gap-2">
+           <Package size={14} className={item.itemStatus === 'Produced' ? 'text-sky-600' : 'text-slate-300'} />
+           {item.serialNumber}
+        </div>
       </td>
-      <td className="p-4">
-        <input type="number" disabled={isReadOnly} value={outp} onChange={e => setOutp(e.target.value)} className="w-32 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow" placeholder="0.00" />
+      <td className="p-5">
+        <input 
+          type="number" value={inputVal} onChange={e => setInputVal(e.target.value)}
+          disabled={!isEditing || isLocked}
+          className={`w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none transition-all ${(!isEditing || isLocked) ? 'bg-slate-50 text-slate-400' : ''}`}
+          placeholder="Tare Wait"
+        />
       </td>
-      <td className="p-4 font-mono font-medium text-gray-700 bg-gray-50/50">
-        {currentNet} <span className="text-xs text-gray-400 font-sans">{config.outputUnit}</span>
+      <td className="p-5">
+        <input 
+          type="number" value={outputVal} onChange={e => setOutputVal(e.target.value)}
+          disabled={!isEditing || isLocked}
+          className={`w-full bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none transition-all ${(!isEditing || isLocked) ? 'bg-slate-50 text-slate-400' : ''}`}
+          placeholder="Gross Wait"
+        />
       </td>
-      <td className="p-4 text-center">
-        {curVal ? (
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
-            ${curVal.color === 'green' ? 'bg-green-100 text-green-700 border border-green-200' :
-              curVal.color === 'red' ? 'bg-red-100 text-red-700 border border-red-200' :
-                'bg-amber-100 text-amber-700 border border-amber-200'}`}>
-            {curVal.indicator}
-          </span>
-        ) : <span className="text-gray-400 text-xs italic tracking-wide">Pending</span>}
-      </td>
-      <td className="p-4 text-right">
-        <button
-          onClick={handleProcess}
-          disabled={isReadOnly || !curVal}
-          className="bg-primary hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm"
-        >
-          Submit
-        </button>
+      <td className="p-5 text-right pr-8">
+        {!isEditing ? (
+           <button 
+             onClick={() => !isLocked && setIsEditing(true)}
+             disabled={isLocked}
+             className={`p-2 rounded-lg transition-all ${isLocked ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-sky-600 hover:bg-sky-50'}`}
+           >
+             <Edit3 size={18} />
+           </button>
+        ) : (
+           <button 
+             onClick={handleSubmit}
+             disabled={isLocked || inputVal === '' || outputVal === ''}
+             className="bg-sky-600 text-white px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-md disabled:bg-slate-200 disabled:text-slate-400"
+           >
+             Save
+           </button>
+        )}
       </td>
     </tr>
   );

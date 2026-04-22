@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
+import { Search, Plus, Edit3, ArrowLeft, Filter, Download } from 'lucide-react';
 
 export default function FillingBatchCreation() {
-  const { productConfig, batches, deleteBatch, fetchBatches, setActiveBatchNumber } = useSharedState();
-
-  const [isCreating, setIsCreating] = useState(false);
+  const { productConfig, batches, fetchBatches } = useSharedState();
+  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [editingBatch, setEditingBatch] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [form, setForm] = useState({
     batchNumber: '',
@@ -17,28 +19,62 @@ export default function FillingBatchCreation() {
     shift: 'Morning',
   });
 
-  const [submitted, setSubmitted] = useState(false);
+  // Auto-generate ID when "New" is clicked
+  useEffect(() => {
+    if (view === 'form' && !editingBatch) {
+      const prefix = form.gasType.substring(0, 3).toUpperCase();
+      const num = Math.floor(1000 + Math.random() * 9000);
+      const year = new Date().getFullYear();
+      setForm(prev => ({ ...prev, batchNumber: `BATCH-${year}-${prefix}-${num}` }));
+    }
+  }, [view, editingBatch, form.gasType]);
+
+  const handleNew = () => {
+    setEditingBatch(null);
+    setForm({
+      batchNumber: '',
+      date: new Date().toISOString().split('T')[0],
+      productType: Object.keys(productConfig)[0],
+      gasType: 'Oxygen',
+      fillingStation: '',
+      tankId: '',
+      operatorName: '',
+      shift: 'Morning',
+    });
+    setView('form');
+  };
+
+  const handleEdit = (batch) => {
+    setEditingBatch(batch);
+    setForm({
+      batchNumber: batch.batchNumber,
+      date: batch.date || new Date().toISOString().split('T')[0],
+      productType: batch.productType,
+      gasType: batch.gasType || 'Oxygen',
+      fillingStation: batch.fillingStation || '',
+      tankId: batch.tankId || '',
+      operatorName: batch.operatorName || '',
+      shift: batch.shift || 'Morning',
+    });
+    setView('form');
+  };
 
   const handleChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const generateBatchNumber = () => {
-    const prefix = form.gasType.substring(0, 3).toUpperCase();
-    const num = Math.floor(1000 + Math.random() * 9000);
-    const year = new Date().getFullYear();
-    setForm(prev => ({ ...prev, batchNumber: `BATCH-${year}-${prefix}-${num}` }));
-  };
-
   const handleSubmit = async () => {
     if (!form.batchNumber || !form.fillingStation || !form.operatorName) {
-      alert('Please fill all required fields (Batch Number, Filling Station, Operator Name)');
+      alert('Please fill all required fields');
       return;
     }
 
     try {
-      await fetch('/api/batches', {
-        method: 'POST',
+      const url = editingBatch ? `/api/batches/${editingBatch.batchNumber}` : '/api/batches';
+      const method = editingBatch ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           batch_number: form.batchNumber,
@@ -52,91 +88,223 @@ export default function FillingBatchCreation() {
         })
       });
 
-      // Reset form
-      setForm({
-        batchNumber: '', date: new Date().toISOString().split('T')[0],
-        productType: Object.keys(productConfig)[0], gasType: 'Oxygen',
-        fillingStation: '', tankId: '', operatorName: '', shift: 'Morning',
-      });
+      if (!res.ok) throw new Error('API Error');
 
-      setIsCreating(false);
-
-      // Refresh batches in context and set the new batch as active
       await fetchBatches();
-      setActiveBatchNumber(form.batchNumber);
+      setView('list');
     } catch (err) {
-      console.error('Failed to create batch:', err);
-      alert('Failed to create batch. Check if batch number already exists.');
+      alert('Failed to save batch data.');
     }
   };
 
-  const handleDelete = async (batchNumber) => {
-    if (!confirm(`Are you sure you want to delete batch "${batchNumber}"? This will also delete all its items.`)) return;
-    try {
-      await deleteBatch(batchNumber);
-    } catch (err) {
-      console.error('Failed to delete batch:', err);
-      alert('Failed to delete batch.');
-    }
-  };
+  const filteredBatches = batches.filter(b => 
+    b.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    b.productType.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
+  if (view === 'form') {
+    return (
+      <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300">
+        <div className="p-8 pb-4">
+           <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-xs uppercase tracking-widest mb-4 transition-colors">
+             <ArrowLeft size={14} /> Back to Batch List
+           </button>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+             {editingBatch ? 'EDIT' : 'CREATE'} FILLING BATCH
+           </h2>
+           <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px] mt-1">
+             Process ID Registry
+           </p>
+        </div>
+
+        <div className="flex-1 p-8 pt-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden w-full max-w-4xl">
+            <div className="h-1.5 bg-sky-600 w-full"></div>
+            <div className="p-8">
+              <div className="grid grid-cols-2 gap-x-12 gap-y-8">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Batch Number *</label>
+                  <input type="text" value={form.batchNumber} disabled
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-mono font-bold text-sky-800 cursor-not-allowed shadow-inner" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Registration Date *</label>
+                  <input type="date" value={form.date} onChange={e => handleChange('date', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all" />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Product Category *</label>
+                  <select value={form.productType} onChange={e => handleChange('productType', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all cursor-pointer">
+                    {Object.entries(productConfig).map(([key, cfg]) => (
+                      <option key={key} value={key}>{cfg.productName} ({key})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Specific Gas Type *</label>
+                  <select value={form.gasType} onChange={e => handleChange('gasType', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all cursor-pointer">
+                    <option>Oxygen</option>
+                    <option>Nitrogen</option>
+                    <option>Argon</option>
+                    <option>Hydrogen</option>
+                    <option>Acetylene</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Filling Station ID *</label>
+                  <input type="text" value={form.fillingStation} onChange={e => handleChange('fillingStation', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all"
+                    placeholder="e.g. STN-A1" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Source Tank ID</label>
+                  <input type="text" value={form.tankId} onChange={e => handleChange('tankId', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all"
+                    placeholder="e.g. TANK-900" />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Operator Authority *</label>
+                  <input type="text" value={form.operatorName} onChange={e => handleChange('operatorName', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all"
+                    placeholder="Signature Name" />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Operational Shift *</label>
+                  <select value={form.shift} onChange={e => handleChange('shift', e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl p-3.5 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all cursor-pointer">
+                    <option>Morning</option>
+                    <option>Evening</option>
+                    <option>Night</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-12 pt-8 border-t border-slate-100 flex justify-end gap-4">
+                <button 
+                  onClick={() => setView('list')}
+                  className="px-8 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors uppercase tracking-widest"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleSubmit}
+                  className="bg-sky-600 hover:bg-sky-700 text-white px-10 py-3 rounded-xl text-sm font-bold transition-all shadow-lg hover:shadow-sky-200 transform hover:-translate-y-0.5 uppercase tracking-widest"
+                >
+                  {editingBatch ? 'Update Record' : 'Post Batch'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-      {!isCreating ? (
-        /* ─── LIST VIEW ─── */
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-6 bg-sky-500 rounded-full"></div>
-              <h3 className="font-bold text-gray-800 text-lg">Batch Records</h3>
-            </div>
-            <button
-              onClick={() => setIsCreating(true)}
-              className="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center gap-2"
-            >
-              + Create New Batch
-            </button>
-          </div>
+    <div className="flex flex-col h-full bg-slate-50 w-full font-sans animate-in fade-in duration-300">
+      {/* Header / Filter Bar */}
+      <div className="p-8 pb-4 flex justify-between items-end">
+        <div>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Batch Registry</h2>
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] mt-1">Central Production Logs</p>
+        </div>
+        <div className="flex items-center gap-3">
+           <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search By Batch #"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all w-64 shadow-sm"
+              />
+           </div>
+           <button className="bg-white border border-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm uppercase tracking-widest">
+             <Filter size={14} /> Filter
+           </button>
+           <button className="bg-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm uppercase tracking-widest">
+             <Download size={14} /> Export
+           </button>
+           <button onClick={handleNew} className="bg-sky-600 text-white px-6 py-2.5 rounded-xl text-xs font-bold hover:bg-sky-700 transition-all flex items-center gap-2 shadow-lg shadow-sky-100 uppercase tracking-widest">
+             <Plus size={14} /> New Record
+           </button>
+        </div>
+      </div>
+
+      {/* Status Legend */}
+      <div className="px-8 py-2 flex items-center gap-6">
+         <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded bg-rose-600 text-white flex items-center justify-center text-[9px] font-black">S</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Saved (Draft)</span>
+         </div>
+         <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded bg-sky-600 text-white flex items-center justify-center text-[9px] font-black">P</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Posted (Final)</span>
+         </div>
+      </div>
+
+      {/* Table Section */}
+      <div className="flex-1 p-8 pt-4 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-white border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
-                  <th className="p-4">Batch Number</th>
-                  <th className="p-4">Product Type</th>
-                  <th className="p-4 text-center">Cylinders</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right pr-6">Action</th>
+                <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                  <th className="p-5 pl-8 border-r border-slate-700/50">Batch Number</th>
+                  <th className="p-5 border-r border-slate-700/50">Product Type</th>
+                  <th className="p-5 border-r border-slate-700/50 text-center">Cylinders</th>
+                  <th className="p-5 border-r border-slate-700/50">Operator</th>
+                  <th className="p-5 border-r border-slate-700/50 text-center">Status</th>
+                  <th className="p-5 text-right pr-8">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {batches.length > 0 ? batches.map(batch => (
-                  <tr key={batch.batchNumber} className="hover:bg-sky-50/30 transition-colors">
-                    <td className="p-4 font-mono text-sky-700 font-semibold">{batch.batchNumber}</td>
-                    <td className="p-4 text-gray-600 font-medium">{batch.productType}</td>
-                    <td className="p-4 text-center font-bold text-gray-800">
-                      <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg border border-gray-200/50">{batch.items.length}</span>
-                    </td>
-                    <td className="p-4">
-                      <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
-                        batch.status === 'Complete'
-                          ? 'bg-green-50 text-green-700 border-green-200'
-                          : 'bg-amber-50 text-amber-700 border-amber-200'
-                      }`}>{batch.status}</span>
-                    </td>
-                    <td className="p-4 text-right pr-6">
-                      <button
-                        onClick={() => handleDelete(batch.batchNumber)}
-                        className="text-red-400 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-                      >
-                        Delete
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {filteredBatches.length > 0 ? filteredBatches.map(batch => (
+                  <tr key={batch.batchNumber} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="p-5 pl-8 font-mono text-sky-700 font-black">
+                      <button className="hover:underline underline-offset-4 decoration-sky-300">
+                        {batch.batchNumber}
                       </button>
+                    </td>
+                    <td className="p-5 text-slate-600 font-bold">{batch.productType}</td>
+                    <td className="p-5 text-center">
+                      <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-black border border-slate-200/50">
+                        {batch.items?.length || 0}
+                      </span>
+                    </td>
+                    <td className="p-5 text-slate-600 font-medium">
+                       {batch.operatorName || '—'}
+                    </td>
+                    <td className="p-5 text-center">
+                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-[10px] font-black text-white shadow-sm ${
+                        batch.isPosted ? 'bg-sky-600' : 'bg-rose-600'
+                      }`}>
+                        {batch.statusTab}
+                      </span>
+                    </td>
+                    <td className="p-5 text-right pr-8">
+                       <button 
+                         onClick={() => handleEdit(batch)}
+                         disabled={batch.isPosted}
+                         className={`p-2 rounded-lg transition-all ${
+                            batch.isPosted 
+                            ? 'text-slate-300 cursor-not-allowed bg-slate-50' 
+                            : 'text-slate-400 hover:text-sky-600 hover:bg-sky-50'
+                         }`}
+                       >
+                         <Edit3 size={18} />
+                       </button>
                     </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan="5" className="p-16 text-center text-gray-400 italic font-medium bg-gray-50/50">
-                      No batch records found yet. Click "Create New Batch" to get started.
+                    <td colSpan="6" className="p-20 text-center text-slate-400 italic font-bold bg-slate-50/30">
+                      NO RECORDS DETECTED IN REGISTRY
                     </td>
                   </tr>
                 )}
@@ -144,110 +312,7 @@ export default function FillingBatchCreation() {
             </table>
           </div>
         </div>
-      ) : (
-        /* ─── CREATE VIEW ─── */
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-sky-500"></div>
-          <button
-            onClick={() => setIsCreating(false)}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-lg"
-          >
-            ✕
-          </button>
-
-          <h2 className="text-xl font-bold text-gray-800 mb-1 pl-4">Filling Batch Creation</h2>
-          <p className="text-xs text-gray-400 pl-4 mb-6 uppercase tracking-widest font-semibold">Group cylinders into a batch</p>
-
-          {submitted && (
-            <div className="mx-4 mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm font-medium">
-              Batch created successfully! It is now the active batch. Add cylinders in Process Entry.
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Batch Number <span className="text-red-500">*</span></label>
-              <div className="flex gap-2">
-                <input type="text" value={form.batchNumber} onChange={e => handleChange('batchNumber', e.target.value)}
-                  className="flex-1 bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none font-mono"
-                  placeholder="e.g. BATCH-2024-OXY-001" />
-                <button onClick={generateBatchNumber}
-                  className="bg-sky-100 text-sky-700 px-3 rounded-lg text-xs font-semibold hover:bg-sky-200 transition-colors border border-sky-200 whitespace-nowrap">
-                  Auto-Generate
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Date <span className="text-red-500">*</span></label>
-              <input type="date" value={form.date} onChange={e => handleChange('date', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Product Type <span className="text-red-500">*</span></label>
-              <select value={form.productType} onChange={e => handleChange('productType', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
-                {Object.entries(productConfig).map(([key, cfg]) => (
-                  <option key={key} value={key}>{cfg.productName} ({key})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Gas Type <span className="text-red-500">*</span></label>
-              <select value={form.gasType} onChange={e => handleChange('gasType', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
-                <option>Oxygen</option>
-                <option>Nitrogen</option>
-                <option>Argon</option>
-                <option>Hydrogen</option>
-                <option>Acetylene</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-6 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Filling Station <span className="text-red-500">*</span></label>
-              <input type="text" value={form.fillingStation} onChange={e => handleChange('fillingStation', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none"
-                placeholder="e.g. Station A" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Tank ID (Source of Gas)</label>
-              <input type="text" value={form.tankId} onChange={e => handleChange('tankId', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none"
-                placeholder="e.g. TANK-001" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-8 pl-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Operator Name <span className="text-red-500">*</span></label>
-              <input type="text" value={form.operatorName} onChange={e => handleChange('operatorName', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none"
-                placeholder="Enter operator name" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Shift <span className="text-red-500">*</span></label>
-              <select value={form.shift} onChange={e => handleChange('shift', e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
-                <option>Morning</option>
-                <option>Evening</option>
-                <option>Night</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="pl-4 pt-4 border-t border-gray-100 flex justify-end">
-            <button onClick={handleSubmit}
-              className="bg-sky-600 hover:bg-sky-700 text-white px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2">
-              Create Batch <span className="text-xl leading-none">→</span>
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

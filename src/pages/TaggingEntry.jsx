@@ -1,255 +1,226 @@
 import React, { useState } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
+import { Search, Edit3, ArrowLeft, Tag, Calendar, ShieldCheck } from 'lucide-react';
 
 export default function TaggingEntry() {
-  const { batches, activeBatch, activeProductConfig, updateItemInBatch } = useSharedState();
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [viewingBatch, setViewingBatch] = useState(null);
-  const [expiryDate, setExpiryDate] = useState('');
+  const { batches, updateItemInBatch } = useSharedState();
+  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [activeBatch, setBatchForTagging] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // ── Build batch-level tagged records ──────────────────────────
-  const taggedBatches = batches
-    .filter(b => b.items.some(i => i.tagNumber))
-    .map(b => {
-      const taggedItems = b.items.filter(i => i.tagNumber);
-      return {
-        batchNumber: b.batchNumber,
-        taggingId: taggedItems[0]?.taggingId || '—',
-        productLabel: taggedItems[0]?.tagLabelType || activeProductConfig?.tagLabelType || '—',
-        cylinderCount: taggedItems.length,
-        expiryDate: taggedItems[0]?.expiryDate || '—',
-        items: taggedItems,
-      };
-    });
+  const handleTaggingInitiate = (batch) => {
+    setBatchForTagging(batch);
+    setView('form');
+  };
 
-  // ── DETAIL VIEW ───────────────────────────────────────────────
-  if (viewingBatch) {
+  const filteredBatches = batches.filter(b => 
+    b.batchNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (view === 'form' && activeBatch) {
+    const itemsToTag = activeBatch.items.filter(i => 
+      i.itemStatus === 'Sealed' || i.itemStatus === 'Tagged' || i.itemStatus === 'In Inventory'
+    );
+    const taggedCount = activeBatch.items.filter(i => i.itemStatus === 'Tagged' || i.itemStatus === 'In Inventory').length;
+
     return (
-      <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-blue-500"></div>
-          <button onClick={() => setViewingBatch(null)}
-            className="absolute top-4 right-4 flex items-center gap-1.5 text-gray-400 hover:text-gray-700 text-sm font-semibold bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors border border-gray-200">
-            ← Back to List
-          </button>
+      <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+        <div className="p-8 pb-4">
+           <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-xs uppercase tracking-widest mb-4 transition-colors">
+             <ArrowLeft size={14} /> Back to Tagging Registry
+           </button>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Traceability Tagging Entry</h2>
+           <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px] mt-1">Batch: <span className="text-sky-600">{activeBatch.batchNumber}</span></p>
+        </div>
 
-          <h2 className="text-xl font-bold text-gray-800 mb-1 pl-4">Tagging Record Details</h2>
-          <p className="text-xs text-gray-400 pl-4 mb-6 uppercase tracking-widest font-semibold">Batch-level tagging record</p>
+        <div className="flex-1 p-8 pt-4 space-y-6">
+           <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex items-center gap-8">
+              <div className="p-4 bg-sky-50 rounded-xl">
+                 <Tag className="text-sky-600" size={24} />
+              </div>
+              <div className="flex-1">
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Digital Twin Status</span>
+                 <div className="text-xl font-black text-slate-800 mt-1">{taggedCount} / {activeBatch.items.filter(i => i.itemStatus === 'Sealed' || i.itemStatus === 'Tagged' || i.itemStatus === 'In Inventory').length} RFID Tags Linked</div>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-lg text-slate-500 text-[10px] font-black uppercase tracking-tighter">
+                 <Calendar size={14} /> Global Expiry Sync Active
+              </div>
+           </div>
 
-          <div className="grid grid-cols-4 gap-4 pl-4 mb-6">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Batch Number</label>
-              <div className="bg-blue-50 border border-blue-200 font-mono text-blue-800 rounded-lg p-2.5 text-sm font-bold">{viewingBatch.batchNumber}</div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Tagging ID (Batch)</label>
-              <div className="bg-gray-50 border border-gray-200 font-mono text-gray-800 rounded-lg p-2.5 text-sm font-bold">{viewingBatch.taggingId}</div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Product Label</label>
-              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">{viewingBatch.productLabel}</div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Expiry Date</label>
-              <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-lg p-2.5 text-sm font-medium">{viewingBatch.expiryDate}</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 pl-4 mb-4">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Cylinders Tagged:</span>
-            <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-200">{viewingBatch.cylinderCount}</span>
-          </div>
-
-          <div className="pl-4">
-            <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-left text-sm">
+           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-white border-b border-gray-200 text-gray-500 text-xs uppercase tracking-widest font-bold">
-                    <th className="p-3 pl-4">#</th>
-                    <th className="p-3">Serial Number</th>
-                    <th className="p-3">Tag Number (Unique)</th>
-                    <th className="p-3">Production Date</th>
-                    <th className="p-3">Expiry Date</th>
+                  <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                    <th className="p-5 pl-8 border-r border-slate-700/50">Serial Number</th>
+                    <th className="p-5 border-r border-slate-700/50">Tag Identifier (TN-)</th>
+                    <th className="p-5 border-r border-slate-700/50">Expiry Schedule</th>
+                    <th className="p-5 text-right pr-8">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {viewingBatch.items.map((item, idx) => (
-                    <tr key={item.serialNumber} className="hover:bg-white transition-colors">
-                      <td className="p-3 pl-4 text-gray-400 font-mono text-xs">{idx + 1}</td>
-                      <td className="p-3 font-mono text-blue-700 font-bold">{item.serialNumber}</td>
-                      <td className="p-3 font-mono text-gray-700 font-bold tracking-widest">{item.tagNumber}</td>
-                      <td className="p-3 text-gray-600">{item.productionDate || '—'}</td>
-                      <td className="p-3 text-gray-600">{item.expiryDate || '—'}</td>
+                <tbody className="divide-y divide-slate-100">
+                  {itemsToTag.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="p-20 text-center text-slate-400 font-bold italic uppercase tracking-widest">No Sealed Items Detected in Station Registry</td>
                     </tr>
+                  ) : itemsToTag.map(item => (
+                    <TaggingRow 
+                      key={item.serialNumber} 
+                      item={item} 
+                      batchNum={activeBatch.batchNumber} 
+                      isBatchPosted={activeBatch.isPosted}
+                      updateFn={updateItemInBatch} 
+                    />
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
+           </div>
         </div>
       </div>
     );
   }
 
-  // ── MAIN VIEW ─────────────────────────────────────────────────
-  if (!activeBatch || !activeProductConfig) return <div>Loading...</div>;
-
-  const itemsToTag = activeBatch.items.filter(i => i.itemStatus === 'Sealed');
-
-  // Tagging ID = batch-level (same for all cylinders in batch)
-  const batchTaggingId = `TAG-${activeBatch.batchNumber}`;
-
-  // Auto-compute expiry from first item's production date
-  const defaultExpiry = (() => {
-    const firstItem = itemsToTag.find(i => i.productionDate);
-    if (!firstItem) return '';
-    const d = new Date(firstItem.productionDate);
-    d.setDate(d.getDate() + activeProductConfig.expiryIntervalDays);
-    return d.toISOString().split('T')[0];
-  })();
-
-  const handleTagAll = () => {
-    if (itemsToTag.length === 0) return;
-
-    itemsToTag.forEach((item, idx) => {
-      // Tag Number = unique per cylinder
-      const tagNum = `TN-${activeBatch.batchNumber}-${String(idx + 1).padStart(3, '0')}`;
-      updateItemInBatch(activeBatch.batchNumber, item.serialNumber, {
-        taggingId: batchTaggingId,    // same for all in batch
-        tagNumber: tagNum,             // unique per cylinder
-        expiryDate: expiryDate || defaultExpiry,
-        itemStatus: 'Tagged',
-      });
-    });
-  };
-
-  const itemsTaggedCount = activeBatch.items.filter(i => i.itemStatus === 'Tagged').length;
-  const processedItemsCount = activeBatch.items.filter(i => i.processStatus === 'Success' && i.qcStatus === 'QC Passed').length;
-  const isAllTagged = processedItemsCount > 0 && itemsTaggedCount === processedItemsCount;
-
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto font-sans">
-      {/* ── Past Records (Batch Level) ─── */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-            <h3 className="font-bold text-gray-800 text-lg">Tagging Records (by Batch)</h3>
-          </div>
-          <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Click a Batch to view details</span>
+    <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+      <div className="p-8 pb-4 flex justify-between items-end">
+        <div>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Tagging & Traceability Registry</h2>
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] mt-1">RFID & Certification Logs</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-white border-b border-gray-200 text-gray-500 font-bold tracking-wide text-xs uppercase">
-                <th className="p-4">Batch Number</th>
-                <th className="p-4">Tagging ID (Batch)</th>
-                <th className="p-4">Product Label</th>
-                <th className="p-4 text-center">Cylinders Tagged</th>
-                <th className="p-4">Expiry Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {taggedBatches.length > 0 ? taggedBatches.map(rec => (
-                <tr key={rec.batchNumber} className="hover:bg-blue-50/30 transition-colors">
-                  <td className="p-4">
-                    <button onClick={() => setViewingBatch(rec)}
-                      className="font-mono text-blue-600 font-semibold hover:text-blue-800 hover:underline underline-offset-2 transition-colors">
-                      {rec.batchNumber}
-                    </button>
-                  </td>
-                  <td className="p-4 font-mono text-gray-700 font-bold">{rec.taggingId}</td>
-                  <td className="p-4 text-gray-600">{rec.productLabel}</td>
-                  <td className="p-4 text-center">
-                    <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg border border-gray-200/50 font-bold">{rec.cylinderCount}</span>
-                  </td>
-                  <td className="p-4 text-gray-500">{rec.expiryDate}</td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan="5" className="p-12 text-center text-gray-400 italic font-medium bg-gray-50/50">No tagged batch records yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-3">
+           <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search Batch ID..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all w-64 shadow-sm"
+              />
+           </div>
         </div>
       </div>
 
-      {/* ── Entry Form ─── */}
-      {isAllTagged ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Batch {activeBatch.batchNumber} is Dispatch-Ready!</h2>
-          <p className="text-gray-500 mb-4 text-center max-w-md text-sm">All successfully processed items have been sealed and tagged. Ready for finished goods inventory.</p>
-          <div className="bg-green-50 text-green-700 px-6 py-2.5 rounded-lg border border-green-200 font-semibold tracking-wide text-sm">
-            {itemsTaggedCount} ITEMS TAGGED
-          </div>
-        </div>
-      ) : itemsToTag.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-white rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-lg font-bold text-gray-800 mb-2">No Items to Tag</h2>
-          <p className="text-gray-500 text-sm text-center max-w-md">All sealed items in this batch have been tagged, or no items have been sealed yet.</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-          <h2 className="text-lg font-bold text-gray-800 mb-6 border-b border-gray-100 pb-3">Tag Batch: {activeBatch.batchNumber}</h2>
+      <div className="flex-1 p-8 pt-4 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
+           <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                  <th className="p-5 pl-8 border-r border-slate-700/50">Batch ID</th>
+                  <th className="p-5 border-r border-slate-700/50">Units Pending Tag</th>
+                  <th className="p-5 border-r border-slate-700/50">Tagging Status</th>
+                  <th className="p-5 text-right pr-12">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredBatches.map(batch => {
+                  const sealed = batch.items.filter(i => i.itemStatus === 'Sealed').length;
+                  const tagged = batch.items.filter(i => i.itemStatus === 'Tagged' || i.itemStatus === 'In Inventory').length;
+                  const totalSealed = sealed + tagged;
+                  const progress = totalSealed > 0 ? (tagged / totalSealed) * 100 : 0;
 
-          <div className="grid grid-cols-4 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Tagging ID (Batch)</label>
-              <input type="text" disabled value={batchTaggingId} className="w-full bg-gray-50 border border-gray-200 text-blue-700 rounded-lg p-2.5 text-sm font-mono font-bold cursor-not-allowed" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Batch</label>
-              <input type="text" disabled value={activeBatch.batchNumber} className="w-full bg-gray-50 border border-gray-200 text-gray-500 rounded-lg p-2.5 text-sm cursor-not-allowed font-medium" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Product Label</label>
-              <div className="bg-gray-100 px-3 py-2.5 rounded-lg border border-gray-200 text-xs font-bold tracking-wide text-gray-700">
-                {activeProductConfig.tagLabelType}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Expiry / Next Review</label>
-              <input type="date" value={expiryDate || defaultExpiry} onChange={e => setExpiryDate(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Cylinders to be Tagged ({itemsToTag.length})</h3>
-            <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="bg-white border-b border-gray-200 text-gray-500 text-xs uppercase tracking-widest font-bold">
-                    <th className="p-3 pl-4">#</th>
-                    <th className="p-3">Serial Number</th>
-                    <th className="p-3">Tag Number (will be assigned)</th>
-                    <th className="p-3">Production Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {itemsToTag.map((item, idx) => (
-                    <tr key={item.serialNumber} className="hover:bg-white transition-colors">
-                      <td className="p-3 pl-4 text-gray-400 font-mono text-xs">{idx + 1}</td>
-                      <td className="p-3 font-mono text-blue-700 font-bold">{item.serialNumber}</td>
-                      <td className="p-3 font-mono text-gray-400 text-xs">TN-{activeBatch.batchNumber}-{String(idx + 1).padStart(3, '0')}</td>
-                      <td className="p-3 text-gray-600">{item.productionDate || '—'}</td>
+                  return (
+                    <tr key={batch.batchNumber} className="hover:bg-slate-50 transition-colors group">
+                      <td className="p-5 pl-8 font-mono text-sky-700 font-black">
+                        <button onClick={() => handleTaggingInitiate(batch)} className="hover:underline underline-offset-4 decoration-sky-300">
+                          {batch.batchNumber}
+                        </button>
+                      </td>
+                      <td className="p-5 text-slate-600 font-bold">{sealed} / {totalSealed} Pending</td>
+                      <td className="p-5">
+                          <div className="flex items-center gap-3">
+                             <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-sky-600 h-full" style={{ width: `${progress}%` }}></div>
+                             </div>
+                             <span className="text-[10px] font-black text-slate-400">{Math.round(progress)}% CERTIFIED</span>
+                          </div>
+                      </td>
+                      <td className="p-5 text-right pr-8">
+                        <button 
+                          onClick={() => handleTaggingInitiate(batch)}
+                          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all shadow-sm"
+                        >
+                          Execute
+                        </button>
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <button onClick={handleTagAll}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2">
-              Tag All {itemsToTag.length} Cylinders <span className="text-xl leading-none">→</span>
-            </button>
-          </div>
+                  );
+                })}
+              </tbody>
+           </table>
         </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+function TaggingRow({ item, batchNum, isBatchPosted, updateFn }) {
+  const [tagNumber, setTagNumber] = useState(item.tagNumber || '');
+  const [expiryDate, setExpiryDate] = useState(item.expiryDate || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]);
+  const [isEditing, setIsEditing] = useState(!item.tagNumber);
+
+  const handleEditInit = () => {
+    if (!tagNumber) {
+      setTagNumber(`TN-${Date.now().toString().slice(-6)}`);
+    }
+    setIsEditing(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!tagNumber) return;
+    try {
+      await updateFn(batchNum, item.serialNumber, {
+        tagNumber,
+        expiryDate,
+        itemStatus: 'Tagged'
+      });
+      setIsEditing(false);
+    } catch (err) {
+       alert("Certification Tag Injection Failed");
+    }
+  };
+
+  const isLocked = isBatchPosted;
+
+  return (
+    <tr className={`hover:bg-slate-50 transition-colors ${!isEditing ? 'bg-sky-50/5' : ''}`}>
+      <td className="p-5 pl-8 font-mono text-slate-500 font-bold">{item.serialNumber}</td>
+      <td className="p-5">
+        <input 
+          type="text" value={tagNumber} onChange={e => setTagNumber(e.target.value)}
+          disabled={!isEditing || isLocked}
+          className={`w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-black focus:ring-2 focus:ring-sky-500 outline-none transition-all ${(!isEditing || isLocked) ? 'bg-slate-50 text-slate-400 font-mono' : 'text-sky-700 border-sky-100 shadow-sm'}`}
+          placeholder="Enter TN-..."
+        />
+      </td>
+      <td className="p-5">
+         <div className="flex items-center gap-3">
+            <input 
+              type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)}
+              disabled={!isEditing || isLocked}
+              className={`w-full bg-white border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-sky-500 ${(!isEditing || isLocked) ? 'bg-slate-50 text-slate-400' : ''}`}
+            />
+            {item.itemStatus === 'Tagged' && <ShieldCheck size={16} className="text-sky-600" />}
+         </div>
+      </td>
+      <td className="p-5 text-right pr-8">
+        {!isEditing ? (
+           <button 
+             onClick={() => !isLocked && handleEditInit()}
+             disabled={isLocked}
+             className={`p-2 rounded-lg transition-all ${isLocked ? 'text-slate-200 cursor-not-allowed' : 'text-slate-400 hover:text-sky-600 hover:bg-sky-50'}`}
+           >
+             <Edit3 size={18} />
+           </button>
+        ) : (
+           <button 
+             onClick={handleSubmit}
+             disabled={isLocked || !tagNumber}
+             className="bg-sky-600 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg active:scale-95 disabled:bg-slate-200 disabled:text-slate-400"
+           >
+             Certify
+           </button>
+        )}
+      </td>
+    </tr>
   );
 }

@@ -1,199 +1,195 @@
 import React, { useState } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
-
-function generateTxnId() {
-  return `TXN-${Date.now().toString().slice(-6)}`;
-}
+import { Search, ArrowLeft, Warehouse, CheckCircle2, Package, Truck, MoveRight } from 'lucide-react';
 
 export default function FilledInventory() {
-  const { activeBatch, updateItemInBatch } = useSharedState();
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [transactionId] = useState(generateTxnId);
-  const [fromLocation, setFromLocation] = useState('Filling Station');
-  const [toLocation, setToLocation] = useState('Filled Stock Yard');
+  const { batches, updateItemInBatch } = useSharedState();
+  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [activeBatch, setBatchForTransfer] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  if (!activeBatch) return <div>Loading...</div>;
+  const [location, setLocation] = useState('MAIN_STK_YARD');
 
-  const itemsToMove = activeBatch.items.filter(i => i.itemStatus === 'Tagged');
-  const movedItems = activeBatch.items.filter(i => i.itemStatus === 'In Inventory');
-
-  const canSubmit = fromLocation.trim() !== '' && toLocation.trim() !== '';
-
-  const handleMoveAll = () => {
-    if (!canSubmit) return;
-    itemsToMove.forEach(item => {
-      updateItemInBatch(activeBatch.batchNumber, item.serialNumber, {
-        itemStatus: 'In Inventory',
-        inventoryLocation: toLocation,
-        moveDate: date,
-        transactionId,
-      });
-    });
+  const handleTransferInitiate = (batch) => {
+    setBatchForTransfer(batch);
+    setView('form');
   };
 
+  const handleMoveAll = async () => {
+    if (!activeBatch) return;
+    const itemsToMove = activeBatch.items.filter(i => i.itemStatus === 'Tagged');
+    const txnId = `TXN-${Date.now().toString().slice(-6)}`;
+    
+    try {
+      for (const item of itemsToMove) {
+        await updateItemInBatch(activeBatch.batchNumber, item.serialNumber, {
+          itemStatus: 'In Inventory',
+          inventoryLocation: location,
+          moveDate: new Date().toISOString().split('T')[0],
+          transactionId: txnId
+        });
+      }
+      setView('list');
+    } catch (err) {
+      alert("Transfer protocol interrupted");
+    }
+  };
+
+  const filteredBatches = batches.filter(b => 
+    b.batchNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (view === 'form' && activeBatch) {
+    const itemsToMove = activeBatch.items.filter(i => i.itemStatus === 'Tagged');
+    const movedCount = activeBatch.items.filter(i => i.itemStatus === 'In Inventory').length;
+
+    return (
+      <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+        <div className="p-8 pb-4">
+           <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-xs uppercase tracking-widest mb-4 transition-colors">
+             <ArrowLeft size={14} /> Back to Transfer Registry
+           </button>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Bulk Inventory Transfer</h2>
+           <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px] mt-1">Batch Source: <span className="text-sky-600">{activeBatch.batchNumber}</span></p>
+        </div>
+
+        <div className="flex-1 p-8 pt-4 space-y-6">
+           <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm grid grid-cols-3 gap-12">
+              <div className="space-y-4">
+                 <div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inventory Target Site</span>
+                    <select value={location} onChange={e => setLocation(e.target.value)} className="w-full mt-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all">
+                       <option value="MAIN_STK_YARD">MAIN STK YARD</option>
+                       <option value="ZONE_B_DISPATCH">ZONE B DISPATCH</option>
+                       <option value="CUSTOMER_HOLDING">CUSTOMER HOLDING</option>
+                    </select>
+                 </div>
+                 <div className="flex items-center gap-2 text-[10px] font-black text-sky-600 uppercase tracking-tighter bg-sky-50 p-2 rounded border border-sky-100">
+                    <CheckCircle2 size={12} /> Real-time Warehouse Sync MT-01
+                 </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center border-x border-slate-100">
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Units Awaiting Move</span>
+                 <div className="text-5xl font-black text-slate-800">{itemsToMove.length}</div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase mt-1">Verification Required</span>
+              </div>
+
+              <div className="flex flex-col justify-center gap-4">
+                 <button 
+                   onClick={handleMoveAll}
+                   disabled={itemsToMove.length === 0}
+                   className="w-full bg-slate-800 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-200 disabled:opacity-30 flex items-center justify-center gap-3"
+                 >
+                    Execute Global Transfer <MoveRight size={16} />
+                 </button>
+                 <div className="text-center text-[10px] font-bold text-slate-400 uppercase">{movedCount} Units already in Stock</div>
+              </div>
+           </div>
+
+           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                    <th className="p-5 pl-8 border-r border-slate-700/50">Serial Number</th>
+                    <th className="p-5 border-r border-slate-700/50">Tag Number</th>
+                    <th className="p-5 border-r border-slate-700/50">Current Status</th>
+                    <th className="p-5 text-right pr-8">Final Destination</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {itemsToMove.length === 0 && movedCount === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="p-20 text-center text-slate-400 font-bold italic uppercase tracking-widest">Registry Empty - Check Tagging Registry</td>
+                    </tr>
+                  ) : activeBatch.items.filter(i => i.itemStatus === 'Tagged' || i.itemStatus === 'In Inventory').map(item => (
+                    <tr key={item.serialNumber} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-5 pl-8 font-mono text-slate-500 font-bold">{item.serialNumber}</td>
+                      <td className="p-5 text-sky-700 font-black">{item.tagNumber || '—'}</td>
+                      <td className="p-5">
+                         <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${item.itemStatus === 'In Inventory' ? 'bg-sky-50 text-sky-600 border border-sky-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                            {item.itemStatus}
+                         </span>
+                      </td>
+                      <td className="p-5 text-right pr-8 text-slate-400 font-black text-[10px] uppercase">{item.inventoryLocation || 'PENDING'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+           </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 max-w-[1200px] mx-auto font-sans">
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-lg"></div>
-          <div>
-            <div className="text-2xl font-bold text-gray-800">{itemsToMove.length}</div>
-            <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">Ready to Move</div>
-          </div>
+    <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+      <div className="p-8 pb-4 flex justify-between items-end">
+        <div>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Finshed Goods Inventory Registry</h2>
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] mt-1">Terminal Stock Movement Logs</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-lg"></div>
-          <div>
-            <div className="text-2xl font-bold text-teal-600">{movedItems.length}</div>
-            <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">In Inventory</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Header Form */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-teal-500"></div>
-        <h2 className="text-lg font-bold text-gray-800 mb-6 border-b border-gray-100 pb-3">Move to Filled Inventory</h2>
-        <div className="grid grid-cols-3 gap-6 mb-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Transaction ID</label>
-            <input
-              type="text" disabled value={transactionId}
-              className="w-full bg-gray-50 border border-gray-200 text-teal-700 rounded-lg p-2.5 text-sm font-mono font-bold cursor-not-allowed"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Batch Number</label>
-            <input
-              type="text" disabled value={activeBatch.batchNumber}
-              className="w-full bg-gray-50 border border-gray-200 text-gray-500 rounded-lg p-2.5 text-sm cursor-not-allowed font-medium"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Date</label>
-            <input
-              type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              From Location <span className="text-gray-400 font-normal">(Filling Station)</span>
-            </label>
-            <input
-              type="text" value={fromLocation} onChange={e => setFromLocation(e.target.value)}
-              className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
-              placeholder="Filling Station"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              To Location <span className="text-gray-400 font-normal">(Filled Stock Yard)</span>
-            </label>
-            <input
-              type="text" value={toLocation} onChange={e => setToLocation(e.target.value)}
-              className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
-              placeholder="Filled Stock Yard"
-            />
-          </div>
+        <div className="flex items-center gap-3">
+           <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search Batch ID..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all w-64 shadow-sm"
+              />
+           </div>
         </div>
       </div>
 
-      {/* Line Items Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-          <div>
-            <h3 className="font-bold text-gray-800">Tagged Items — Ready for Inventory</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Items must be tagged before they can be moved to filled inventory</p>
-          </div>
-          {itemsToMove.length > 0 && (
-            <button
-              onClick={handleMoveAll}
-              disabled={!canSubmit}
-              className="bg-teal-600 hover:bg-teal-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white px-5 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm flex items-center gap-2"
-            >
-              Move All to Inventory
-            </button>
-          )}
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold tracking-wide text-xs uppercase">
-                <th className="p-4">Cylinder Serial Number</th>
-                <th className="p-4">Tag Number</th>
-                <th className="p-4">Production Date</th>
-                <th className="p-4">From Location</th>
-                <th className="p-4">To Location</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {itemsToMove.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="p-12 text-center text-gray-500 font-medium">
-                    {movedItems.length > 0
-                      ? `  All ${movedItems.length} item(s) have been moved to filled inventory.`
-                      : 'No items ready. Items must be tagged before moving to inventory.'}
-                  </td>
+      <div className="flex-1 p-8 pt-4 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
+           <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                  <th className="p-5 pl-8 border-r border-slate-700/50">Batch ID</th>
+                  <th className="p-5 border-r border-slate-700/50">Tagging Progress</th>
+                  <th className="p-5 border-r border-slate-700/50">Inventory Stock</th>
+                  <th className="p-5 text-right pr-12">Action</th>
                 </tr>
-              ) : itemsToMove.map(item => (
-                <InventoryRow
-                  key={item.serialNumber}
-                  item={item}
-                  fromLocation={fromLocation}
-                  toLocation={toLocation}
-                  date={date}
-                  transactionId={transactionId}
-                  batchNum={activeBatch.batchNumber}
-                  updateFn={updateItemInBatch}
-                  canSubmit={canSubmit}
-                />
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredBatches.map(batch => {
+                  const tagged = batch.items.filter(i => i.itemStatus === 'Tagged' || i.itemStatus === 'In Inventory').length;
+                  const inStock = batch.items.filter(i => i.itemStatus === 'In Inventory').length;
+
+                  return (
+                    <tr key={batch.batchNumber} className="hover:bg-slate-50 transition-colors group">
+                      <td className="p-5 pl-8 font-mono text-sky-700 font-black">
+                        <button onClick={() => handleTransferInitiate(batch)} className="hover:underline underline-offset-4 decoration-sky-300">
+                          {batch.batchNumber}
+                        </button>
+                      </td>
+                      <td className="p-5 text-slate-600 font-bold">{tagged} Tagged Units</td>
+                      <td className="p-5">
+                          <div className="flex items-center gap-3">
+                             <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-sky-600 h-full" style={{ width: `${tagged > 0 ? (inStock / tagged) * 100 : 0}%` }}></div>
+                             </div>
+                             <span className="text-[10px] font-black text-slate-400">{inStock} IN STOCK</span>
+                          </div>
+                      </td>
+                      <td className="p-5 text-right pr-8">
+                        <button 
+                          onClick={() => handleTransferInitiate(batch)}
+                          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all shadow-sm"
+                        >
+                           Transfer
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+           </table>
         </div>
       </div>
     </div>
-  );
-}
-
-function InventoryRow({ item, fromLocation, toLocation, date, transactionId, batchNum, updateFn, canSubmit }) {
-  const handleMove = () => {
-    updateFn(batchNum, item.serialNumber, {
-      itemStatus: 'In Inventory',
-      inventoryLocation: toLocation,
-      moveDate: date,
-      transactionId,
-    });
-  };
-
-  return (
-    <tr className="hover:bg-teal-50/20 transition-colors">
-      <td className="p-4 font-mono text-teal-700 font-semibold">{item.serialNumber}</td>
-      <td className="p-4 font-mono text-gray-600 text-xs">{item.tagNumber || '—'}</td>
-      <td className="p-4 text-gray-600">{item.productionDate || '—'}</td>
-      <td className="p-4 text-gray-600">{fromLocation || 'Filling Station'}</td>
-      <td className="p-4 text-gray-600">{toLocation || 'Filled Stock Yard'}</td>
-      <td className="p-4">
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
-          Filled
-        </span>
-      </td>
-      <td className="p-4 text-right">
-        <button
-          onClick={handleMove}
-          disabled={!canSubmit}
-          className="bg-teal-600 hover:bg-teal-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm"
-        >
-          Move
-        </button>
-      </td>
-    </tr>
   );
 }

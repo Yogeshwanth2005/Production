@@ -1,118 +1,174 @@
 import React, { useState } from 'react';
 import { useSharedState } from '../context/SharedStateContext';
+import { Search, Edit3, ArrowLeft, Filter, Download, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function QualityCheckEntry() {
-  const { activeBatch, updateItemInBatch } = useSharedState();
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [qcId] = useState(`QC-${Date.now().toString().slice(-6)}`);
+  const { batches, updateItemInBatch } = useSharedState();
+  const [view, setView] = useState('list'); // 'list' or 'form'
+  const [activeBatch, setBatchForQC] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Form state
+  const [qcDate, setQcDate] = useState(new Date().toISOString().split('T')[0]);
   const [inspectorName, setInspectorName] = useState('');
 
-  if (!activeBatch) return <div>Loading...</div>;
+  const handleQCInitiate = (batch) => {
+    setBatchForQC(batch);
+    setView('form');
+  };
 
-  const itemsToQC = activeBatch.items.filter(i =>
-    i.itemStatus === 'Produced' && (!i.qcStatus || i.qcStatus === 'Pending QC')
+  const filteredBatches = batches.filter(b => 
+    b.batchNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const passedCount = activeBatch.items.filter(i => i.qcStatus === 'QC Passed').length;
-  const failedCount = activeBatch.items.filter(i => i.qcStatus === 'QC Failed').length;
+
+  if (view === 'form' && activeBatch) {
+    const itemsToQC = activeBatch.items.filter(i =>
+      i.itemStatus === 'Produced' && (!i.qcStatus || i.qcStatus === 'Pending QC')
+    );
+    const passedCount = activeBatch.items.filter(i => i.qcStatus === 'QC Passed').length;
+    const failedCount = activeBatch.items.filter(i => i.qcStatus === 'QC Failed').length;
+
+    return (
+      <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+        <div className="p-8 pb-4">
+           <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold text-xs uppercase tracking-widest mb-4 transition-colors">
+             <ArrowLeft size={14} /> Back to QC Registry
+           </button>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight">QUALITY CHECK ENTRY</h2>
+           <p className="text-xs text-slate-400 font-bold uppercase tracking-[2px] mt-1">Batch: <span className="text-sky-600">{activeBatch.batchNumber}</span></p>
+        </div>
+
+        <div className="flex-1 p-8 pt-4 space-y-6">
+           {/* Stats Bar */}
+           <div className="grid grid-cols-3 gap-6">
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex items-center gap-4">
+                 <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
+                    <Search size={24} />
+                 </div>
+                 <div>
+                    <div className="text-2xl font-black text-slate-800">{itemsToQC.length}</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Review</div>
+                 </div>
+              </div>
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex items-center gap-4">
+                 <div className="h-12 w-12 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600">
+                    <CheckCircle2 size={24} />
+                 </div>
+                 <div>
+                    <div className="text-2xl font-black text-sky-600">{passedCount}</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">QC Passed</div>
+                 </div>
+              </div>
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex items-center gap-4">
+                 <div className="h-12 w-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
+                    <XCircle size={24} />
+                 </div>
+                 <div>
+                    <div className="text-2xl font-black text-rose-600">{failedCount}</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">QC Failed</div>
+                 </div>
+              </div>
+           </div>
+
+           {/* Entry Table */}
+           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                    <th className="p-5 pl-8 border-r border-slate-700/50">Serial Number</th>
+                    <th className="p-5 border-r border-slate-700/50">Gas Purity (%)</th>
+                    <th className="p-5 border-r border-slate-700/50">Pressure</th>
+                    <th className="p-5 border-r border-slate-700/50">Leak Test</th>
+                    <th className="p-5 border-r border-slate-700/50 text-center">Status</th>
+                    <th className="p-5 text-right pr-8">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {itemsToQC.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-20 text-center text-slate-400 font-bold italic uppercase tracking-widest">No Items Pending Inspection</td>
+                    </tr>
+                  ) : itemsToQC.map(item => (
+                    <QCRow 
+                      key={item.serialNumber} 
+                      item={item} 
+                      batchNum={activeBatch.batchNumber} 
+                      updateFn={updateItemInBatch} 
+                    />
+                  ))}
+                </tbody>
+              </table>
+           </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 max-w-[1400px] mx-auto font-sans">
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">⏳</div>
-          <div>
-            <div className="text-2xl font-bold text-gray-800">{itemsToQC.length}</div>
-            <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">Pending QC</div>
-          </div>
+    <div className="flex flex-col h-full bg-slate-50 w-full animate-in fade-in duration-300 font-sans">
+      <div className="p-8 pb-4 flex justify-between items-end">
+        <div>
+           <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Quality Assurance Registry</h2>
+           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] mt-1">Inspection Control Center</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-lg">✅</div>
-          <div>
-            <div className="text-2xl font-bold text-emerald-600">{passedCount}</div>
-            <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">QC Passed</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-4">
-          <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center text-lg">❌</div>
-          <div>
-            <div className="text-2xl font-bold text-red-600">{failedCount}</div>
-            <div className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-0.5">QC Failed</div>
-          </div>
+        <div className="flex items-center gap-3">
+           <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search Batch ID..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all w-64 shadow-sm"
+              />
+           </div>
+           <button className="bg-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-sm uppercase tracking-widest">
+             <Download size={14} /> Export Logs
+           </button>
         </div>
       </div>
 
-      {/* Header Form */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-        <h2 className="text-lg font-bold text-gray-800 mb-6 border-b border-gray-100 pb-3">Quality Check Entry</h2>
-        <div className="grid grid-cols-4 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">QC ID</label>
-            <input
-              type="text" disabled value={qcId}
-              className="w-full bg-gray-50 border border-gray-200 text-emerald-700 rounded-lg p-2.5 text-sm font-mono font-bold cursor-not-allowed"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Batch Number</label>
-            <input
-              type="text" disabled value={activeBatch.batchNumber}
-              className="w-full bg-gray-50 border border-gray-200 text-gray-500 rounded-lg p-2.5 text-sm cursor-not-allowed font-medium"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Date</label>
-            <input
-              type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Inspector Name</label>
-            <input
-              type="text" value={inspectorName} onChange={e => setInspectorName(e.target.value)}
-              className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-              placeholder="Enter inspector name"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Items Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold tracking-wide text-xs uppercase">
-                <th className="p-4">Serial Number</th>
-                <th className="p-4">Gas Purity (%)</th>
-                <th className="p-4">Pressure Check</th>
-                <th className="p-4">Leak Test</th>
-                <th className="p-4">Valve Condition</th>
-                <th className="p-4">QC Status</th>
-                <th className="p-4">Remarks</th>
-                <th className="p-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {itemsToQC.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="p-12 text-center text-gray-500 font-medium">
-                    No items pending QC. Items must be processed in Process Entry first.
-                  </td>
+      <div className="flex-1 p-8 pt-4 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
+           <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-800 text-white text-[10px] font-black uppercase tracking-[2px]">
+                  <th className="p-5 pl-8 border-r border-slate-700/50">Batch ID</th>
+                  <th className="p-5 border-r border-slate-700/50">Pending QC</th>
+                  <th className="p-5 border-r border-slate-700/50">Passed</th>
+                  <th className="p-5 border-r border-slate-700/50">Failed</th>
+                  <th className="p-5 text-right pr-12">Action</th>
                 </tr>
-              ) : itemsToQC.map(item => (
-                <QCRow
-                  key={item.serialNumber}
-                  item={item}
-                  batchNum={activeBatch.batchNumber}
-                  updateFn={updateItemInBatch}
-                />
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredBatches.map(batch => {
+                  const pending = batch.items.filter(i => i.itemStatus === 'Produced' && (!i.qcStatus || i.qcStatus === 'Pending QC')).length;
+                  const passed = batch.items.filter(i => i.qcStatus === 'QC Passed').length;
+                  const failed = batch.items.filter(i => i.qcStatus === 'QC Failed').length;
+
+                  return (
+                    <tr key={batch.batchNumber} className="hover:bg-slate-50 transition-colors group">
+                      <td className="p-5 pl-8 font-mono text-sky-700 font-black">
+                        <button onClick={() => handleQCInitiate(batch)} className="hover:underline underline-offset-4 decoration-sky-300">
+                          {batch.batchNumber}
+                        </button>
+                      </td>
+                      <td className="p-5 text-slate-600 font-bold">{pending}</td>
+                      <td className="p-5 text-sky-600 font-black">{passed}</td>
+                      <td className="p-5 text-rose-600 font-black">{failed}</td>
+                      <td className="p-5 text-right pr-8">
+                        <button 
+                          onClick={() => handleQCInitiate(batch)}
+                          className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all shadow-sm"
+                        >
+                          Details
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+           </table>
         </div>
       </div>
     </div>
@@ -123,9 +179,7 @@ function QCRow({ item, batchNum, updateFn }) {
   const [gasPurity, setGasPurity] = useState('');
   const [pressureCheck, setPressureCheck] = useState('Pass');
   const [leakTest, setLeakTest] = useState('Pass');
-  const [valveCondition, setValveCondition] = useState('Pass');
   const [qcStatus, setQcStatus] = useState('Approved');
-  const [remarks, setRemarks] = useState('');
 
   const handleSubmit = async () => {
     if (gasPurity === '') return;
@@ -134,65 +188,48 @@ function QCRow({ item, batchNum, updateFn }) {
         gasPurity: Number(gasPurity),
         pressureCheck,
         leakTest,
-        valveCondition,
-        remarks,
         qcStatus: qcStatus === 'Approved' ? 'QC Passed' : 'QC Failed',
       });
     } catch (err) {
-      alert("Error submitting QC: " + err.message);
+      alert("QC Submission Failed");
     }
   };
 
-  const selectClass = "border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white transition-shadow";
-
   return (
-    <tr className="hover:bg-emerald-50/20 transition-colors">
-      <td className="p-4 font-mono text-emerald-700 font-semibold">{item.serialNumber}</td>
-      <td className="p-4">
-        <input
+    <tr className="hover:bg-slate-50/50">
+      <td className="p-5 pl-8 font-mono text-slate-500 font-bold">{item.serialNumber}</td>
+      <td className="p-5">
+        <input 
           type="number" value={gasPurity} onChange={e => setGasPurity(e.target.value)}
-          className="w-24 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-shadow"
-          placeholder="e.g. 99.0" min="0" max="100"
+          className="w-24 bg-white border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none"
+          placeholder="99.0"
         />
       </td>
-      <td className="p-4">
-        <select value={pressureCheck} onChange={e => setPressureCheck(e.target.value)} className={selectClass}>
+      <td className="p-5">
+        <select value={pressureCheck} onChange={e => setPressureCheck(e.target.value)} className="bg-white border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-sky-500">
           <option>Pass</option>
           <option>Fail</option>
         </select>
       </td>
-      <td className="p-4">
-        <select value={leakTest} onChange={e => setLeakTest(e.target.value)} className={selectClass}>
+      <td className="p-5">
+        <select value={leakTest} onChange={e => setLeakTest(e.target.value)} className="bg-white border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-sky-500">
           <option>Pass</option>
           <option>Fail</option>
         </select>
       </td>
-      <td className="p-4">
-        <select value={valveCondition} onChange={e => setValveCondition(e.target.value)} className={selectClass}>
-          <option>Pass</option>
-          <option>Fail</option>
+      <td className="p-5 text-center">
+        <select value={qcStatus} onChange={e => setQcStatus(e.target.value)} className="bg-white border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-sky-500 font-bold">
+          <option value="Approved">ACCEPT</option>
+          <option value="Rejected">REJECT</option>
         </select>
       </td>
-      <td className="p-4">
-        <select value={qcStatus} onChange={e => setQcStatus(e.target.value)} className={selectClass}>
-          <option>Approved</option>
-          <option>Rejected</option>
-        </select>
-      </td>
-      <td className="p-4">
-        <input
-          type="text" value={remarks} onChange={e => setRemarks(e.target.value)}
-          className="w-full min-w-[120px] border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-shadow"
-          placeholder="Optional remarks..."
-        />
-      </td>
-      <td className="p-4 text-right">
-        <button
+      <td className="p-5 text-right pr-8">
+        <button 
           onClick={handleSubmit}
           disabled={gasPurity === ''}
-          className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm whitespace-nowrap"
+          className="bg-sky-600 text-white px-5 py-2 rounded-lg text-xs font-black uppercase tracking-widest hover:bg-sky-700 transition-all opacity-80 hover:opacity-100 disabled:opacity-30 shadow-md"
         >
-          ✓ Submit QC
+          Post Results
         </button>
       </td>
     </tr>

@@ -1,15 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #1a56db;
-  --color-success: #16a34a;
-  --color-rejected: #dc2626;
-  --color-pending: #d97706;
-  --color-page: #f9fafb;
-  --color-border-custom: #e5e7eb;
+  --color-primary: #0369a1; /* Royal Blue */
+  --color-secondary: #1e3a8a; /* Navy Blue */
+  --color-status-posted: #1d4ed8; /* Strong Blue (Replaces Green) */
+  --color-status-saved: #be123c; /* Crimson Red (Replaces Orange/Red) */
+  --color-bg-page: #f8fafc;
+  --color-sidebar: #0f172a; /* Extra Dark Navy */
+  --color-border-custom: #e2e8f0;
 }
 
 body {
-  background-color: var(--color-page);
-  color: #111827;
+  background-color: var(--color-bg-page);
+  color: #1e293b;
+  margin: 0;
+  overflow-x: hidden;
+  width: 100vw;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
 }

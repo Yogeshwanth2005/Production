@@ -35,10 +35,17 @@ function convertItem(item) {
 }
 
 function convertBatch(batch) {
+  // Mapping API status to UI labels: Pending -> Saved (S), Complete -> Posted (P)
+  const uiStatus = batch.status === 'Complete' ? 'Posted' : 'Saved';
+  const statusTab = batch.status === 'Complete' ? 'P' : 'S';
+
   return {
     batchNumber: batch.batch_number,
     productType: batch.product_type,
-    status: batch.status,
+    status: uiStatus,
+    statusTab: statusTab,
+    isPosted: batch.status === 'Complete',
+    rawStatus: batch.status,
     items: (batch.items || []).map(convertItem),
   };
 }
