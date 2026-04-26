@@ -22,3 +22,19 @@ body {
   width: 100%;
   min-height: 100vh;
 }
+
+.neat-table-container {
+  @apply w-full h-full bg-white border-y border-slate-200 overflow-hidden;
+}
+
+.neat-table-header {
+  @apply bg-slate-800 text-white text-[11px] font-black uppercase tracking-[2.5px] border-b border-slate-700/50;
+}
+
+.neat-table-row {
+  @apply hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0;
+}
+
+.neat-link {
+  @apply text-sky-600 font-black hover:underline underline-offset-4 decoration-sky-300 cursor-pointer;
+}
