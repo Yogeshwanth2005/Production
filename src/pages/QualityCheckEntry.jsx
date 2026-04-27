@@ -102,7 +102,6 @@ export default function QualityCheckEntry() {
                       batchNum={activeBatch.batchNumber} 
                       isBatchPosted={activeBatch.isPosted}
                       updateFn={updateItemInBatch} 
-                      onLink={() => navigate('/summary')}
                     />
                   ))}
                 </tbody>
@@ -157,7 +156,7 @@ export default function QualityCheckEntry() {
                   return (
                     <tr key={batch.batchNumber} className="neat-table-row">
                       <td className="p-4 pl-8">
-                         <span onClick={() => navigate('/summary')} className="neat-link">{batch.batchNumber}</span>
+                         <span onClick={() => handleQCInitiate(batch)} className="neat-link">{batch.batchNumber}</span>
                       </td>
                       <td className="p-4 text-slate-600 font-bold">{pending} Units Pending</td>
                       <td className="p-4 text-center">
@@ -217,7 +216,7 @@ function QCRow({ item, batchNum, isBatchPosted, updateFn, onLink }) {
   return (
     <tr className="hover:bg-slate-50/50">
       <td className="p-5 pl-8 font-mono text-slate-500 font-bold">
-        <span onClick={onLink} className="neat-link font-mono">{item.serialNumber}</span>
+        <span className="neat-link font-mono">{item.serialNumber}</span>
       </td>
       <td className="p-5">
         <input 

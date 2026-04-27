@@ -107,7 +107,7 @@ export default function FilledInventory() {
                   ) : activeBatch.items.filter(i => i.itemStatus === 'Tagged' || i.itemStatus === 'In Inventory').map(item => (
                     <tr key={item.serialNumber} className="hover:bg-slate-50 transition-colors">
                       <td className="p-5 pl-8 font-mono text-slate-500 font-bold">
-                        <span onClick={() => navigate('/summary')} className="neat-link font-mono">{item.serialNumber}</span>
+                        <span className="neat-link font-mono">{item.serialNumber}</span>
                       </td>
                       <td className="p-5 text-sky-700 font-black">{item.tagNumber || '—'}</td>
                       <td className="p-5">
@@ -170,7 +170,7 @@ export default function FilledInventory() {
                   return (
                     <tr key={batch.batchNumber} className="neat-table-row">
                       <td className="p-4 pl-8">
-                         <span onClick={() => navigate('/summary')} className="neat-link">{batch.batchNumber}</span>
+                         <span onClick={() => handleTransferInitiate(batch)} className="neat-link">{batch.batchNumber}</span>
                       </td>
                       <td className="p-4 text-slate-600 font-bold">{tagged} Tagged Units</td>
                       <td className="p-4 text-center">

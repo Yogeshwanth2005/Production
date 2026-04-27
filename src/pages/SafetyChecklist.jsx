@@ -247,7 +247,7 @@ export default function SafetyChecklist() {
                        <span className="font-mono text-slate-600 font-bold">{cl.id}</span>
                     </td>
                     <td className="p-4">
-                       <span onClick={() => navigate('/summary')} className="neat-link">{cl.batchNumber}</span>
+                       <span onClick={() => handleEdit(cl)} className="neat-link">{cl.batchNumber}</span>
                     </td>
                     <td className="p-4 text-center">
                        <div className="flex justify-center gap-1.5">

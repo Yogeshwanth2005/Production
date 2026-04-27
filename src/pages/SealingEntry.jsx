@@ -134,7 +134,7 @@ export default function SealingEntry() {
                   return (
                     <tr key={batch.batchNumber} className="neat-table-row">
                       <td className="p-4 pl-8">
-                         <span onClick={() => navigate('/summary')} className="neat-link">{batch.batchNumber}</span>
+                         <span onClick={() => handleSealingInitiate(batch)} className="neat-link">{batch.batchNumber}</span>
                       </td>
                       <td className="p-4 text-slate-600 font-bold">{qcPassed} Units Approved</td>
                       <td className="p-4 text-center">
@@ -203,7 +203,7 @@ function SealingRow({ item, batchNum, isBatchPosted, updateFn }) {
   return (
     <tr className={`hover:bg-slate-50 transition-colors ${!isEditing ? 'bg-sky-50/5' : ''}`}>
       <td className="p-5 pl-8 font-mono text-slate-500 font-bold">
-        <span onClick={() => navigate('/summary')} className="neat-link font-mono">{item.serialNumber}</span>
+        <span className="neat-link font-mono">{item.serialNumber}</span>
       </td>
       <td className="p-5">
          <div 

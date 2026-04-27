@@ -265,7 +265,7 @@ export default function FillingBatchCreation() {
                 {filteredBatches.length > 0 ? filteredBatches.map(batch => (
                   <tr key={batch.batchNumber} className="neat-table-row">
                     <td className="p-4 pl-8">
-                       <span onClick={() => navigate('/summary')} className="neat-link">{batch.batchNumber}</span>
+                       <span onClick={() => handleEdit(batch)} className="neat-link">{batch.batchNumber}</span>
                     </td>
                     <td className="p-4">
                        <div className="flex flex-col">

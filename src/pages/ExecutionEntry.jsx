@@ -88,7 +88,6 @@ export default function ExecutionEntry() {
                       batchNum={activeBatch.batchNumber} 
                       isBatchPosted={activeBatch.isPosted}
                       updateFn={updateItemInBatch} 
-                      onLink={() => navigate('/summary')}
                     />
                   ))}
                 </tbody>
@@ -145,7 +144,7 @@ export default function ExecutionEntry() {
                   return (
                     <tr key={batch.batchNumber} className="neat-table-row">
                       <td className="p-4 pl-8">
-                         <span onClick={() => navigate('/summary')} className="neat-link">{batch.batchNumber}</span>
+                         <span onClick={() => handleExecutionInitiate(batch)} className="neat-link">{batch.batchNumber}</span>
                       </td>
                       <td className="p-4">
                           <div className="flex items-center gap-3">
@@ -216,7 +215,7 @@ function ExecutionRow({ item, batchNum, isBatchPosted, updateFn, onLink }) {
       <td className="p-5 pl-8 font-mono text-slate-700 font-bold">
         <div className="flex items-center gap-2">
            <Package size={14} className={item.itemStatus === 'Produced' ? 'text-sky-600' : 'text-slate-300'} />
-           <span onClick={onLink} className="neat-link font-mono">{item.serialNumber}</span>
+           <span className="neat-link font-mono">{item.serialNumber}</span>
         </div>
       </td>
       <td className="p-5">
